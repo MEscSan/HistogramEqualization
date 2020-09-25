@@ -17,7 +17,15 @@ using namespace std;
 Histogram::Histogram(Image& src, int host)
     :_src(src)
 {
-    _numValues = _src.getNumberOfValues();
+    
+    if(_src.getNumberOfValues() == 255)
+    {
+        _numValues = 256;
+    }
+    else
+    {
+        _numValues = _src.getNumberOfValues();
+    }
     _dev_pixels = _src.getDevPixelPtr();
     _host_values = new int[_numValues];
     _host_valuesCumulative = new double[_numValues];
@@ -50,7 +58,7 @@ void Histogram::calculate(dim3 blocks, dim3 threadsPerBlock)
     for (int i = 0; i < _numValues; i++)
     {
         _host_values[i]=0;
-        //_host_lookUpTable[i]=0;
+        _host_lookUpTable[i]=0;
         _host_valuesCumulative[i]=0;
 
     }
@@ -88,14 +96,18 @@ void Histogram::calculate(dim3 blocks, dim3 threadsPerBlock)
     {
         n += blocks.x - n%blocks.x;
     }
+    int nPartial =  128;
 
-   gpuErrchk( cudaMalloc((void**)& g_partialCumulative, _numValues*blocks.x*sizeof(int)));
-    gpuErrchk( cudaMalloc((void**)& sums, n*sizeof(int)/128));
+    gpuErrchk( cudaMalloc((void**)& g_partialCumulative, n*sizeof(int)));
+    gpuErrchk( cudaMalloc((void**)& sums, n*sizeof(int)/nPartial));
 
     //partialCumulativeHistograms<<<blocks, threadsPerBlock, n*sizeof(int)/blocks.x>>>(_dev_values, g_partialCumulative, sums, _numValues, n);
-    partialCumulativeHistograms<<<n/128, 128/2, 128*sizeof(int)>>>(_dev_values, g_partialCumulative, sums, _numValues, n);
+
+    partialCumulativeHistograms<<<n/nPartial, nPartial/2, nPartial*sizeof(int)>>>(_dev_values, g_partialCumulative, sums, n, nPartial);
     gpuErrchk( cudaGetLastError());
-    globalCumulativeHistogram<<<blocks, threadsPerBlock>>>(g_partialCumulative, sums, _dev_valuesCumulative, _numValues,n, rows, cols);
+    auxiliaryCumulativeHistogram<<<1, n/(2*nPartial), n*sizeof(int)/nPartial>>>(sums, n/nPartial);
+    gpuErrchk( cudaGetLastError());
+    globalCumulativeHistogram<<<blocks, threadsPerBlock>>>(g_partialCumulative, sums, _dev_valuesCumulative, _numValues, nPartial, rows, cols);
     gpuErrchk( cudaGetLastError());
 
     gpuErrchk(cudaMemcpy(_host_values, _dev_values, _numValues*sizeof(int), cudaMemcpyDeviceToHost));
@@ -108,18 +120,7 @@ void Histogram::calculate(dim3 blocks, dim3 threadsPerBlock)
     cudaFree(g_partialCumulative);
     cudaFree(sums);
     cudaFree(g_partialHistograms);
-    //cudaFree(_dev_lookUpTable);   
-        
-    // Cumulative histogram (serially, for the moment)
-    /*double cdfval=0;
 
-    numPixels = rows*cols;
-        
-    for (int i = 0; i < _numValues; i++)
-    {
-        cdfval += (_host_values[i])/(double)numPixels;
-        _host_valuesCumulative[i] = cdfval;
-    }*/
 }
 
 void Histogram::host_calculate()
@@ -164,7 +165,8 @@ void Histogram::host_calculate()
 
     for (int i = 0; i < _numValues; i++)
     {
-        cdfval += (_host_values[i])/(double)numPixels;
+        //cdfval += (_host_values[i])/(double)numPixels;
+        cdfval += (_host_values[i]);
         _host_valuesCumulative[i] = cdfval;
     }
 }
@@ -375,10 +377,10 @@ void Histogram::host_normalize()
    
 
     //Calculate new Histogram
-    calculate();
+    host_calculate();
 
     //Transform the image back to RGB-Space if necessary
-    _src.yuv2rgb();
+    _src.host_yuv2rgb();
 
 }
 
@@ -410,81 +412,6 @@ void Histogram::save(string path)
     
     dstFile.close ();
 }
-
-// Cuda implementation of the serial histogram algorithm using shared memory and atomic operations
-/*__global__ void dev_calculate(unsigned char* pixelPtr, int* values, double* valuesCumulative, unsigned char* lookUpTable, int rows, int cols, colorSpace color)
-{
-    double numPixels = rows*cols;
-    
-    extern __shared__ int s_values[];
-
-    extern __shared__ double s_valuesCumulative[];
-    //extern __shared__ unsigned char s_lookUpTable[]
-
-    int numValues = sizeof(s_values[])/sizeof(int);
-
-    //Reset values-array and _lookupTable with 0s
-    for (int i = blockIdx.x*blockDim.x + threadIdx.x; i < numValues; i+= blockDim.x*gridDim.x)
-    {
-        s_values[i]=0;
-        s_lookUpTable[i]=0;
-        valuesCumulative[i]=0;
-    }
-
-    // Get the histogram, depending on the image type
-
-    //****COLOR SPACE DEPENDENT OPERATION****
-    if( color == colorSpace::gvp)
-    {
-        // Shared histogram
-        for (int i = blockIdx.x*blockDim.x + threadIdx.x; i < numPixels; i+= blockDim.x*gridDim.x)
-        {
-            value = pixelPtr[i];
-            atomicAdd(&s_values[value], 1);
- 
-        }
-        _syncThreads();
-
-        double cdfval=0;
-        
-        // Cumulative histogram (scan)
-        //...//
-        for (int i = 0; i < numValues; i++)
-        {
-            atomicAdd();
-            cdfval += (values[i])/(double)numPixels;
-            _host_valuesCumulative[i] = cdfval;
-        }
-        _syncThreads();
-    }
-    else
-    {
-        // RGB-Images are transformed to YUV-Color space; the histogram-class only takes the y-channel (luminance) into account
-        
-        _src.rgb2yuv();
-
-        
-        for (int i = 0; i < numPixels; i+=3)
-        {
-            value = pixelPtr[i];
-            _host_values[value]++; 
-        }
-
-        numPixels = rows*cols;
-        
-        double cdfval=0;
-        
-        for (int i = 0; i < _numValues; i++)
-         {
-            cdfval += (_host_values[i])/(double)numPixels;
-            _host_valuesCumulative[i] = cdfval;
-        }
-
-    }
-    //**************************************
-
-};
-*/
 
 // Implement a one-dimensional version of the local-histograms-kernel proposed in https://developer.nvidia.com/blog/gpu-pro-tip-fast-histograms-using-shared-atomics-maxwell/
 __global__ void partialHistograms(unsigned char* pixelPtr, int* g_partialHistograms, int numValues, int rows, int cols, int channels)
@@ -547,45 +474,51 @@ __global__ void globalHistogram(int* g_partialHistograms, int* histogram, int nu
 
 // Algorithm proposed in "GPU Gems 3", chapter 39 (Parallel Prefix Sum (Scan) with CUDA) for parallelization of prefix sum
 // The Kernel assumes that the array size is a multiple of the number of blocks, this assumption must be checked before the kernel call
-__global__ void partialCumulativeHistograms(int* values, int* g_partialCumulative, int* sums, int numValues, int n)
+__global__ void partialCumulativeHistograms(int* values, int* g_partialCumulative, int* sums, int n, int nPartial)
 {
     extern __shared__ int s_partialCumulative[];
 
     int localThreadIdx = threadIdx.x;
+    int globalThreadIdx = threadIdx.x + blockIdx.x*blockDim.x;
     int localNumThreads = blockDim.x;
-    
-    //int globalThreadIdx = threadIdx.x + blockIdx.x*blockDim.x;
-    //int globalNumThreads = blockDim.x*gridDim.x;
 
     int offset = 1;
     
     // Initialize shared memory with 0-values
-    //for(int i = localThreadIdx; i < n/gridDim.x; i+=localNumThreads)
-    for(int i = localThreadIdx; i < 128; i+=localNumThreads)
+    for(int i = localThreadIdx; i < nPartial; i+=localNumThreads)
     {
         s_partialCumulative[i]=0;
     }
     __syncthreads();
     
     // Copy input histogram into shared memory
-    //for(int i = globalThreadIdx; i<numValues/2; i += globalNumThreads)
-    //for(int i= localThreadIdx; i < n/(2*gridDim.x); i+=localNumThreads )
-    for(int i= localThreadIdx; i < 128/2; i+=localNumThreads )
+    for(int i= localThreadIdx; i < nPartial>>1; i+=localNumThreads )
     {
-        s_partialCumulative[i*2] = values[2*i + blockIdx.x*n/gridDim.x];
-        s_partialCumulative[i*2 + 1] = values[2*i + blockIdx.x*n/gridDim.x + 1];
+
+        s_partialCumulative[i*2] = values[2*globalThreadIdx];
+        s_partialCumulative[i*2 + 1] = values[2*globalThreadIdx + 1];
+
+        /*int a = i + CONFLICT_FREE_OFFSET(i);
+        int b = i + nPartial>>1;
+        b += CONFLICT_FREE_OFFSET(b);
+        
+        s_partialCumulative[a] = values[globalThreadIdx];
+        s_partialCumulative[b] = values[globalThreadIdx + nPartial/2];*/
     }
     __syncthreads();
     
     // Up-Sweep Phase of the Sum-Scan-Algorithm
-    //for (int d = (n/gridDim.x)>>1; d > 0; d >>= 1) 
-    for (int d = 128>>1; d > 0; d >>= 1) 
+    for (int d = nPartial>>1; d > 0; d >>= 1) 
     { 
         __syncthreads();   
         if (localThreadIdx < d)    
         { 
             int a = offset*(2*localThreadIdx+1)-1;     
             int b = offset*(2*localThreadIdx+2)-1;  
+
+            /*a += CONFLICT_FREE_OFFSET(a);
+            b += CONFLICT_FREE_OFFSET(b);*/
+
             s_partialCumulative[b] += s_partialCumulative[a];    
         }    
         offset *= 2; 
@@ -594,13 +527,14 @@ __global__ void partialCumulativeHistograms(int* values, int* g_partialCumulativ
     // Clear the last element  
     if (localThreadIdx == 0) 
     { 
-        sums[blockIdx.x] =  s_partialCumulative[127];
-        s_partialCumulative[127] = 0; 
+        sums[blockIdx.x] =  s_partialCumulative[nPartial - 1];
+        g_partialCumulative[blockIdx.x*nPartial + nPartial - 1] = s_partialCumulative[nPartial - 1];
+        s_partialCumulative[nPartial - 1] = 0; 
     } 
     
     // Down-Sweep Phase of the Sum-Scan-Algorithm
     //for (int d = 1; d < (n/gridDim.x); d *= 2)
-    for (int d = 1; d < 128; d *= 2)
+    for (int d = 1; d < nPartial; d *= 2)
     {      
         offset >>= 1;      
         __syncthreads();      
@@ -609,6 +543,9 @@ __global__ void partialCumulativeHistograms(int* values, int* g_partialCumulativ
             int a = offset*(2*localThreadIdx+1)-1;     
             int b = offset*(2*localThreadIdx+2)-1; 
              
+            /*a += CONFLICT_FREE_OFFSET(a);
+            b += CONFLICT_FREE_OFFSET(b);
+            */
             int t = s_partialCumulative[a]; 
             s_partialCumulative[a] = s_partialCumulative[b]; 
             s_partialCumulative[b] += t;       
@@ -617,126 +554,92 @@ __global__ void partialCumulativeHistograms(int* values, int* g_partialCumulativ
     __syncthreads(); 
     
     // Write the partial cumulative sums to global memory analog to the partialHistograms-Kernel
-    g_partialCumulative += blockIdx.x*numValues;
+    g_partialCumulative += blockIdx.x*nPartial;
     //for(int i = localThreadIdx; i < n/gridDim.x; i+=localNumThreads)
-    for(int i = localThreadIdx; i < 128; i+=localNumThreads)
+    for(int i = localThreadIdx; i < nPartial - 1; i+=localNumThreads)
     {
-        g_partialCumulative[i] = s_partialCumulative[i];
+        /*int a = i + CONFLICT_FREE_OFFSET(i) + 1;
+        int b = i + nPartial>>1;
+        int bankOffsetB =  CONFLICT_FREE_OFFSET(b);
+        g_partialCumulative[i] = s_partialCumulative[a];
+        g_partialCumulative[b] = s_partialCumulative[b+bankOffsetB];*/
+
+        g_partialCumulative[i] = s_partialCumulative[i+1];
     }
 }
 
-__global__ void globalCumulativeHistogram(int* g_partialCumulative, int* sums, double* _dev_valuesCumulative, int numValues, int n, int rows, int cols)
+__global__ void auxiliaryCumulativeHistogram(int* sums,  int n)
 {
    //Apply parallel Scan-Sum ALgorithm to the sums-array containing the sums of the partial cumulative histograms using global memory
 
-    int globalThreadIdx = threadIdx.x+ blockIdx.x*blockDim.x;
-    int globalNumThreads = blockDim.x*gridDim.x;
+
+    extern __shared__ int s_sums[];
+    int localThreadIdx = threadIdx.x;
+    int localNumThreads = blockDim.x;
+    //int globalThreadIdx = threadIdx.x + blockIdx.x*blockDim.x;
     
+    // COpy sums-array to shared memory
+    for(int i = localThreadIdx; i< n>>1; i+=localNumThreads)
+    {
+        s_sums[2*i] = sums[2*i];
+        s_sums[2*i + 1] = sums[2*i + 1];
+    }
+    __syncthreads();
+
     int offset = 1;
 
     // Up-Sweep Phase of the Sum-Scan-Algorithm
-    for (int d = gridDim.x >>1; d > 0; d >>= 1) 
+    for (int d = n >>1; d > 0; d >>= 1) 
     { 
-        if (globalThreadIdx < d)    
+        __syncthreads();
+        if (localThreadIdx < d)    
         { 
-            int a = offset*(2*globalThreadIdx+1)-1;     
-            int b = offset*(2*globalThreadIdx+2)-1;  
-            sums[b] += sums[a];    
+            int a = offset*(2*localThreadIdx+1)-1;     
+            int b = offset*(2*localThreadIdx+2)-1;  
+            s_sums[b] += s_sums[a];    
         }    
         offset *= 2; 
     } 
 
    /// Clear the last element  
-    if (globalThreadIdx == 0) 
+    if (localThreadIdx == 0) 
     { 
-        sums[gridDim.x - 1] = 0; 
-    } 
+        s_sums[n-1] = 0; 
+    }
 
     // Down-Sweep Phase of the Sum-Scan-Algorithm
-    for (int d = 1; d < gridDim.x; d *= 2)
+    for (int d = 1; d <n; d *= 2)
     {      
-        offset >>= 1;      
-        if (globalThreadIdx< d)      
-        { 
-            int a = offset*(2*globalThreadIdx+1)-1;     
-            int b = offset*(2*globalThreadIdx+2)-1; 
-             
-            int t = sums[a]; 
-            sums[a] = sums[b]; 
-            sums[b] += t;       
-        } 
-    }
-
-    // Add i-th cumulative sums value to the (i+1)th values of the partial cumulative histogram
-    //for( int i = globalThreadIdx; i<numValues; i+=globalNumThreads )
-    for( int i = globalThreadIdx; i<numValues; i+=globalNumThreads )
-    {
-        /*if( i< n/gridDim.x )
-        {
-            _dev_valuesCumulative[i] = n;//g_partialCumulative[i] /(double)( rows*cols );
-        }
-        else
-        {*/
-            //_dev_valuesCumulative[i] = (g_partialCumulative[i] + sums[i*gridDim.x/n])/(double) ( rows*cols );
-            
-            _dev_valuesCumulative[i] = sums[i/128];
-            //_dev_valuesCumulative[i] = i*gridDim.x/n;
-        //}
-    }
-}
-
-/*
-
-#define NUM_BANKS 16 
-#define LOG_NUM_BANKS 4 
-#define CONFLICT_FREE_OFFSET(n) \ ((n) >> NUM_BANKS + (n) >> (2 * LOG_NUM_BANKS)) 
-
-__global__ void prescan(float *g_odata, float *g_idata, int n) 
-{ 
-    extern __shared__ float temp[]; // allocated on invocation 
-
-    int thid = threadIdx.x; 
-    int offset = 1; 
-
-    temp[2*thid] = g_idata[2*thid]; // load input into shared memory 
-    temp[2*thid+1] = g_idata[2*thid+1]; 
- 	
-    for (int d = n>>1; d > 0; d >>= 1) // build sum in place up the tree 
-    { 
-        __syncthreads();   
-        if (thid < d)    
-        { 
-            int ai = offset*(2*thid+1)-1;     
-            int bi = offset*(2*thid+2)-1;  
-            temp[bi] += temp[ai];    
-        }    
-        offset *= 2; 
-    } 
-    
-    if (thid == 0) 
-    { 
-        temp[n - 1] = 0; 
-    } // clear the last element  
- 	
-    for (int d = 1; d < n; d *= 2) // traverse down tree & build scan 
-    {      
-        offset >>= 1;      
+        offset >>= 1;
         __syncthreads();      
-        if (thid < d)      
+        if (localThreadIdx< d)      
         { 
-            int ai = offset*(2*thid+1)-1;     
-            int bi = offset*(2*thid+2)-1; 
+            int a = offset*(2*localThreadIdx+1)-1;     
+            int b = offset*(2*localThreadIdx+2)-1; 
              
-            float t = temp[ai]; 
-            temp[ai] = temp[bi]; 
-            temp[bi] += t;       
+            int t = s_sums[a]; 
+            s_sums[a] = s_sums[b]; 
+            s_sums[b] += t;       
         } 
-    }  
-    __syncthreads(); 
+    }
+    __syncthreads();
 
-    g_odata[2*thid] = temp[2*thid]; // write results to device memory    
-    g_odata[2*thid+1] = temp[2*thid+1]; 
- 	
+    // Copy to global memory
+    for(int i=localThreadIdx; i<n; i+=localNumThreads)
+    {
+        sums[i] = s_sums[i]; 
+    }
+
 }
 
-*/
+__global__ void globalCumulativeHistogram(int* g_partialCumulative, int* sums, double* _dev_valuesCumulative, int numValues, int nPartial, int rows, int cols)
+{
+    int globalThreadIdx = threadIdx.x + blockIdx.x*blockDim.x; 
+    int globalNumThreads = gridDim.x*blockDim.x;
+
+    for( int i = globalThreadIdx; i<numValues; i+= globalNumThreads )
+    {
+        _dev_valuesCumulative[i] = (g_partialCumulative[i] + sums[i/nPartial])/(double) ( rows*rows );
+        //_dev_valuesCumulative[i] = (g_partialCumulative[i]);
+    }
+}
