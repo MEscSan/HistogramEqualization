@@ -59,16 +59,20 @@ __device__ unsigned char dev_getMax(unsigned char* arrayPtr, int arraySize, colo
 
 __global__ void dev_calculate(unsigned char* pixelPtr, int* values, double* valuesCumulative, unsigned char* lookUpTable,  int rows, int cols, colorSpace color);
 
-// Implement a one-dimensional version of the local-histograms-kernel proposed in https://developer.nvidia.com/blog/gpu-pro-tip-fast-histograms-using-shared-atomics-maxwell/
+// Implements a one-dimensional version of the local-histograms-kernel proposed in https://developer.nvidia.com/blog/gpu-pro-tip-fast-histograms-using-shared-atomics-maxwell/
 __global__ void partialHistograms(unsigned char* pixelPtr, int* g_partialHistograms,int numValues, int rows, int cols, int channels);
 
-// Implement partial-histograms-reduction kernel as proposed in https://developer.nvidia.com/blog/gpu-pro-tip-fast-histograms-using-shared-atomics-maxwell/
+// Implements partial-histograms-reduction kernel as proposed in https://developer.nvidia.com/blog/gpu-pro-tip-fast-histograms-using-shared-atomics-maxwell/
 __global__ void globalHistogram(int* g_partialHistograms, int* histogram, int numValues, int numPartialHistograms);
 
 // Algorithm and code proposed in "GPU Gems 3", chapter 39 (Parallel Prefix Sum (Scan) with CUDA) for parallelization of prefix sum
 __global__ void partialCumulativeHistograms(int* values, int* g_partialCumulative, int* sums, int n, int nPartial);
 __global__ void auxiliaryCumulativeHistogram(int* sums, int n);
-__global__ void globalCumulativeHistogram(int* g_partialCumulative, int* sums, double* _dev_valuesCumulative, int numValues, int nPartial, int rows, int cols);
+__global__ void globalCumulativeHistogram(int* g_partialCumulative, int* sums, double* dev_valuesCumulative, int numValues, int nPartial, int rows, int cols);
 
-__global__ void dev_equalize();
-__global__ void dev_normalize();
+// Creates the lookup-table for histogram normalizaton
+__global__ void normalizationLookUpTable(unsigned char* dev_lookUpTable, int numValues, unsigned char max, unsigned char min);
+__global__ void  equalizationLookUpTable(unsigned char* dev_lookUpTable, double* dev_valuesCumulative, int numValues);
+
+// Updates Pixel-values using the lookup Table
+__global__ void updatePixelsFromLookUp( unsigned char* pixelPtr, unsigned char* dev_lookUpTable, int rows, int cols, int channels);

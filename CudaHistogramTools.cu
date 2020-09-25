@@ -121,6 +121,9 @@ void Histogram::calculate(dim3 blocks, dim3 threadsPerBlock)
     cudaFree(sums);
     cudaFree(g_partialHistograms);
 
+    //Convert back to RGB if necessary
+    _src.yuv2rgb();
+
 }
 
 void Histogram::host_calculate()
@@ -165,10 +168,12 @@ void Histogram::host_calculate()
 
     for (int i = 0; i < _numValues; i++)
     {
-        //cdfval += (_host_values[i])/(double)numPixels;
-        cdfval += (_host_values[i]);
+        cdfval += (_host_values[i])/(double)numPixels;
         _host_valuesCumulative[i] = cdfval;
     }
+
+    // Convert back to RGB if necessary
+    _src.host_yuv2rgb();
 }
 
 void Histogram::display(ostream& output)
@@ -190,10 +195,49 @@ void Histogram::display(ostream& output)
     
 }
 
+void Histogram::equalize(dim3 blocks, dim3 threadsPerBlock)
+{
+    //Calculate the normalized color-values into a lookup table assuming a minimum value 0 and a maximum equals the number of values
+    int rows = _src.getRows();
+    int cols = _src.getCols();
+    int channels = _src.getNumberOfChannels();
+    int numPixels = rows*cols*channels;
+    unsigned char* host_pixelPtr = (unsigned char*)_src.getPixelPtr(); 
+
+    gpuErrchk(cudaMalloc((void**)& _dev_lookUpTable, _numValues*sizeof(unsigned char)));
+    gpuErrchk(cudaMalloc((void**)& _dev_pixels, numPixels*sizeof(unsigned char)));
+    gpuErrchk(cudaMalloc((void**)& _dev_valuesCumulative, _numValues*sizeof(double)));
+
+    gpuErrchk(cudaMemcpy(_dev_lookUpTable, _host_lookUpTable, _numValues*sizeof(unsigned char), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(_dev_pixels, host_pixelPtr, numPixels*sizeof(unsigned char), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(_dev_valuesCumulative, _host_valuesCumulative, _numValues*sizeof(double),cudaMemcpyHostToDevice));
+    
+    equalizationLookUpTable<<<1, 256, _numValues*sizeof(unsigned char)>>>(_dev_lookUpTable, _dev_valuesCumulative, _numValues);
+    gpuErrchk(cudaGetLastError());
+    updatePixelsFromLookUp<<<blocks, threadsPerBlock>>>(_dev_pixels, _dev_lookUpTable, rows, cols, channels);
+    gpuErrchk(cudaGetLastError());
+
+    gpuErrchk(cudaMemcpy(_host_lookUpTable, _dev_lookUpTable, _numValues*sizeof(unsigned char), cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy( host_pixelPtr, _dev_pixels, numPixels*sizeof(unsigned char), cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(_host_valuesCumulative, _dev_valuesCumulative, _numValues*sizeof(double), cudaMemcpyDeviceToHost));
+
+    cudaFree(_dev_lookUpTable);
+    cudaFree(_dev_pixels);
+    cudaFree(_dev_valuesCumulative);
+
+    calculate();
+
+    //Transform the image back to RGB-Space if necessary
+     _src.yuv2rgb();
+}
+
 // Source: 2010_Szeleski_Computer Vision, algorithm and Applications, 3.1.4 bzw. 2012_Prince_ComputervisionModelsLearningAndInferenz
 void Histogram::host_equalize()
 {
-    int numPixels = _src.getRows()*_src.getCols()*_src.getNumberOfChannels();
+    int rows = _src.getRows();
+    int cols = _src.getCols();
+    int channels = _src.getNumberOfChannels();
+    int numPixels = rows*cols*channels;
     unsigned char* pixelPtr = (unsigned char*)_src.getPixelPtr();
 
     // The normalized cumulative histogram is used as a lookup-table to calculate the new color values
@@ -202,38 +246,21 @@ void Histogram::host_equalize()
         _host_lookUpTable[i] = clamp( _numValues*_host_valuesCumulative[i]);
 
     }
+
+    if(_src.getColorSpace()==colorSpace::rgb)
+    {
+        _src.host_rgb2yuv();
+    }
     
-    // Equalize image
-    //****COLOR SPACE DEPENDENT OPERATION****//
-    if(_src.getColorSpace()== colorSpace::gvp)
+    for (int i = 0; i < numPixels; i+=channels)
     {
-        for (int i = 0; i < numPixels; i++)
-        {
-            unsigned char oldPixelVal = pixelPtr[i];
-            unsigned char newPixelVal = _host_lookUpTable[oldPixelVal];
-            pixelPtr[i] = newPixelVal; 
-        }
+        unsigned char oldPixelVal = pixelPtr[i];
+        unsigned char newPixelVal = _host_lookUpTable[oldPixelVal];
+        pixelPtr[i] = newPixelVal; 
     }
-    else
-    {
-
-        //if(_src.getColorSpace() == colorSpace::rgb)
-        //{    
-        _src.rgb2yuv();
-        //}
-
-        // In color (yuv) images only the y-channel is equalized
-        for (int i = 0; i < numPixels; i+=3)
-        {
-            unsigned char oldPixelVal = pixelPtr[i];
-            unsigned char newPixelVal = _host_lookUpTable[oldPixelVal];
-            pixelPtr[i] = newPixelVal; 
-        }
-    }
-    //***************************************//
 
     //Calculate new Histogram
-    calculate();
+    host_calculate();
 
     //Transform the image back to RGB-Space if necessary
     _src.host_yuv2rgb();
@@ -325,6 +352,40 @@ unsigned char getMin(unsigned char* arrayPtr, int arraySize, colorSpace cs)
     return minVal;
 }
 
+void Histogram::normalize(dim3 blocks, dim3 threadsPerBlock)
+{
+    //Calculate the normalized color-values into a lookup table assuming a minimum value 0 and a maximum equals the number of values
+    int rows = _src.getRows();
+    int cols = _src.getCols();
+    int channels = _src.getNumberOfChannels();
+    int numPixels = rows*cols*channels;
+    unsigned char* host_pixelPtr = (unsigned char*)_src.getPixelPtr(); 
+
+    unsigned char maxPixel = getMax(host_pixelPtr, numPixels, _src.getColorSpace());
+    unsigned char minPixel = getMin(host_pixelPtr, numPixels, _src.getColorSpace());
+
+    gpuErrchk(cudaMalloc((void**)& _dev_lookUpTable, _numValues*sizeof(unsigned char)));
+    gpuErrchk(cudaMalloc((void**)& _dev_pixels, numPixels*sizeof(unsigned char)));
+
+    gpuErrchk(cudaMemcpy(_dev_lookUpTable, _host_lookUpTable, _numValues*sizeof(unsigned char), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(_dev_pixels, host_pixelPtr, numPixels*sizeof(unsigned char), cudaMemcpyHostToDevice));
+    
+    normalizationLookUpTable<<<1, 256, _numValues*sizeof(unsigned char)>>>(_dev_lookUpTable,_numValues, maxPixel, minPixel);
+    gpuErrchk(cudaGetLastError());
+    updatePixelsFromLookUp<<<blocks, threadsPerBlock>>>(_dev_pixels, _dev_lookUpTable, rows, cols, channels);
+    gpuErrchk(cudaGetLastError());
+
+    gpuErrchk(cudaMemcpy(_host_lookUpTable, _dev_lookUpTable, _numValues*sizeof(unsigned char), cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy( host_pixelPtr, _dev_pixels, numPixels*sizeof(unsigned char), cudaMemcpyDeviceToHost));
+    
+    cudaFree(_dev_lookUpTable);
+    cudaFree(_dev_pixels); 
+
+    calculate();
+
+    _src.yuv2rgb();
+}
+
 // Normalize Histogram, Source:2012_Nixon_FeaturesExtraction, 3.3.2 Histogram normalization
 void Histogram::host_normalize()
 {
@@ -341,40 +402,21 @@ void Histogram::host_normalize()
     // Create Lookup-table
     for (int i = 0; i < _numValues; i++)
     {
-        _host_lookUpTable[i] = _numValues*(i - minPixel)/(double)(maxPixel-minPixel);           
-        //_host_lookUpTable[i] = (unsigned char)(_numValues*i/(double)(255));
+        _host_lookUpTable[i] = clamp(_numValues*(i - minPixel)/(double)(maxPixel-minPixel));           
     }
     
     // Normalize image
-
-    //****COLOR SPACE DEPENDENT OPERATION****//
-    if(_src.getColorSpace()== colorSpace::gvp)
+    if(_src.getColorSpace()== colorSpace::rgb)
     {
- 
-        for (int i = 0; i < numPixels; i++)
-        {
-            unsigned char oldPixelVal = pixelPtr[i];
-            unsigned char newPixelVal = _host_lookUpTable[oldPixelVal];
-            pixelPtr[i] = newPixelVal; 
-        }
+        _src.host_rgb2yuv();
     }
-    else
+    
+    for (int i = 0; i < numPixels; i+= channels)
     {
-        //if(_src.getColorSpace() == colorSpace::rgb)
-        //{
-        _src.rgb2yuv();
-        //}
-
-        // In color (yuv) images only the y-channel is equalized
-        for (int i = 0; i < numPixels; i+=3)
-        {
-            unsigned char oldPixelVal = pixelPtr[i];
-            unsigned char newPixelVal = _host_lookUpTable[oldPixelVal];
-            pixelPtr[i] = newPixelVal; 
-        }
+        unsigned char oldPixelVal = pixelPtr[i];
+        unsigned char newPixelVal = _host_lookUpTable[oldPixelVal];
+        pixelPtr[i] = newPixelVal; 
     }
-    //***************************************//
-   
 
     //Calculate new Histogram
     host_calculate();
@@ -642,4 +684,59 @@ __global__ void globalCumulativeHistogram(int* g_partialCumulative, int* sums, d
         _dev_valuesCumulative[i] = (g_partialCumulative[i] + sums[i/nPartial])/(double) ( rows*rows );
         //_dev_valuesCumulative[i] = (g_partialCumulative[i]);
     }
+}
+
+// Assuming the lookup table can have a maximum of 256 values (according to its data-type) the normalization can be carried out by a single block
+// Should the grid size be bigger than 1, all further blocks remain unused, as an exchange the calculation can be implemented using only shared-memory 
+__global__ void normalizationLookUpTable(unsigned char* dev_lookUpTable, int numValues, unsigned char max, unsigned char min)
+{
+    extern __shared__ unsigned char s_lookUpTable[];
+
+    int localThreadIdx = threadIdx.x;
+    int localNumThreads = blockDim.x;
+
+    for(int i=localThreadIdx; i<numValues; i+=localNumThreads)
+    {
+        s_lookUpTable[i] = dev_clamp(numValues*(i - min)/(double)(max-min));  
+    }
+    __syncthreads();
+
+    for(int i=localThreadIdx; i<numValues; i+=localNumThreads)
+    {
+        dev_lookUpTable[i] = s_lookUpTable[i];  
+    }
+
+}
+
+__global__ void equalizationLookUpTable(unsigned char* dev_lookUpTable, double* dev_valuesCumulative, int numValues)
+{
+    extern __shared__ unsigned char s_lookUpTable[];
+
+    int localThreadIdx = threadIdx.x;
+    int localNumThreads = blockDim.x;
+
+    for(int i=localThreadIdx; i<numValues; i+=localNumThreads)
+    {
+        s_lookUpTable[i] = dev_clamp(numValues*dev_valuesCumulative[i]);  
+    }
+    __syncthreads();
+
+    for(int i=localThreadIdx; i<numValues; i+=localNumThreads)
+    {
+        dev_lookUpTable[i] = s_lookUpTable[i];  
+    }
+}
+
+
+__global__ void updatePixelsFromLookUp( unsigned char* pixelPtr, unsigned char* dev_lookUpTable, int rows, int cols, int channels)
+{
+    int globalThreadIdx = threadIdx.x + blockIdx.x*blockDim.x;
+    int globalNumThreads = gridDim.x*blockDim.x;
+
+    for(int i = globalThreadIdx; i<rows*cols; i+=globalNumThreads)
+    {
+        unsigned char oldPixelVal = pixelPtr[i*channels];
+        pixelPtr[i*channels] = dev_lookUpTable[oldPixelVal];
+    }
+
 }

@@ -618,7 +618,7 @@ void imageToArray (int rows, int cols, int channels, fileType type, FILE * src, 
     
 }
 
-__device__ double dev_clamp(double x, double min, double max)
+/*inline __device__ double dev_clamp(double x, double min, double max)
 {
         double y = x;
         if(x<min)
@@ -631,7 +631,7 @@ __device__ double dev_clamp(double x, double min, double max)
                 y = max - 0.1;
         }
         return y;
-}
+}*/
 
 __host__ double clamp(double x, double min, double max)
 {
@@ -648,7 +648,7 @@ __host__ double clamp(double x, double min, double max)
         return y;
 }
 
-__device__ int dev_clamp(int x, int min, int max)
+/*__device__ int dev_clamp(int x, int min, int max)
 {
        int y = x;
        if(x<min)
@@ -661,7 +661,7 @@ __device__ int dev_clamp(int x, int min, int max)
                 y = max;
         }
         return y;
-}
+}*/
 
 __host__ int clamp(int x, int min, int max)
 {

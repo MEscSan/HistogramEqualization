@@ -177,8 +177,35 @@ void imageToArray(int rows, int cols, int channels, fileType type, FILE * src, u
 __host__ double clamp(double x, double min = 0, double max = 255);
 __host__ int clamp (int x, int min = 0, int max = 255);
 
-__device__ double dev_clamp(double x, double min = 0, double max = 255);
-__device__ int dev_clamp (int x, int min = 0, int max = 255);
+inline __device__ double dev_clamp(double x, double min = 0, double max = 255)
+{
+
+    double y = x;
+    if(x<min)
+    {
+            y = min;
+    }
+    else if(x>=max)
+    {
+            //In order to avoid artifacts because of double to char conversion
+            y = max - 0.1;
+    }
+    return y;
+}
+inline __device__ int dev_clamp (int x, int min = 0, int max = 255)
+{
+           int y = x;
+       if(x<min)
+        {
+                y = min;
+        }
+        else if(x>=max)
+        {
+                
+                y = max;
+        }
+        return y;
+}
 
 // FUnctions to be run on the cuda-device
 __global__ void dev_color2gvp(unsigned char* pixels_ptr, colorSpace color, int rows, int cols);
