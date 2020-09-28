@@ -204,6 +204,11 @@ void Histogram::equalize(dim3 blocks, dim3 threadsPerBlock)
     int numPixels = rows*cols*channels;
     unsigned char* host_pixelPtr = (unsigned char*)_src.getPixelPtr(); 
 
+    if(_src.getColorSpace()==colorSpace::rgb)
+    {
+        _src.rgb2yuv();
+    }
+
     gpuErrchk(cudaMalloc((void**)& _dev_lookUpTable, _numValues*sizeof(unsigned char)));
     gpuErrchk(cudaMalloc((void**)& _dev_pixels, numPixels*sizeof(unsigned char)));
     gpuErrchk(cudaMalloc((void**)& _dev_valuesCumulative, _numValues*sizeof(double)));
@@ -363,6 +368,11 @@ void Histogram::normalize(dim3 blocks, dim3 threadsPerBlock)
 
     unsigned char maxPixel = getMax(host_pixelPtr, numPixels, _src.getColorSpace());
     unsigned char minPixel = getMin(host_pixelPtr, numPixels, _src.getColorSpace());
+
+    if(_src.getColorSpace()==colorSpace::rgb)
+    {
+        _src.rgb2yuv();
+    }
 
     gpuErrchk(cudaMalloc((void**)& _dev_lookUpTable, _numValues*sizeof(unsigned char)));
     gpuErrchk(cudaMalloc((void**)& _dev_pixels, numPixels*sizeof(unsigned char)));

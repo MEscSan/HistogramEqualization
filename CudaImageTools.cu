@@ -10,6 +10,7 @@
 #include "CudaImageTools.h"
 #include "CudaErrorHelper.h"
 
+
 using namespace std;
 
 // Generates an Image-Object with dimensions 1x1, default file-type is pbmBin, default pixel-value is 0
@@ -329,11 +330,12 @@ void Image::rgb2yuv(dim3 blocks, dim3 threadsPerBlock)
 {
         if(_colorSpace == colorSpace::rgb)
         {
+                
                 gpuErrchk( cudaMalloc((void**)&_dev_pixels, _rows*_cols*3*sizeof(unsigned char)));
 
                 gpuErrchk( cudaMemcpy(_dev_pixels, _host_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyHostToDevice));
 
-                dev_rgb2yuv<<<blocks, threadsPerBlock>>>(_dev_pixels, _rows, _cols);
+                dev_rgb2yuv<<< blocks, threadsPerBlock>>>(_dev_pixels, _rows, _cols);
 
                 gpuErrchk(cudaGetLastError());
 
@@ -345,6 +347,25 @@ void Image::rgb2yuv(dim3 blocks, dim3 threadsPerBlock)
         } 
 }
 
+void Image::rgb2hsv(dim3 blocks, dim3 threadsPerBlock)
+{
+        if(_colorSpace == colorSpace::rgb)
+        {
+                gpuErrchk( cudaMalloc((void**)&_dev_pixels, _rows*_cols*3*sizeof(unsigned char)));
+
+                gpuErrchk( cudaMemcpy(_dev_pixels, _host_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyHostToDevice));
+
+                dev_rgb2hsv<<<blocks, threadsPerBlock>>>(_dev_pixels, _rows, _cols);
+
+                gpuErrchk(cudaGetLastError());
+
+                gpuErrchk(cudaMemcpy(_host_pixels, _dev_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyDeviceToHost));
+
+                cudaFree(_dev_pixels);
+                
+                _colorSpace = colorSpace::hsv;
+        } 
+}
 
 // Analog to RGB->YUV transform, solving the equation for the RGB-vector (values smaller than 1e-5 rounded to 0)
 //      RGB = ( M^(-1) ) x (YUV - K)
@@ -413,21 +434,6 @@ void Image::host_color2gvp()
         }
 }
 
-// Source: https://en.wikipedia.org/wiki/YUV#Converting_between_Y%E2%80%B2UV_and_RGB
-// 2010_ Szeleski_Bildanalyse -> pg. 88
-// Transform according to the equation:
-//      YUV = M x RGB + K
-// Conversion with correction factors, actually RGB <-> YCbCr transform according to Wikipedia
-// Conversion Matrix:(CHANGE with Matrix from Nixon 13.3.6.3)
-//          0.299        0.587           0.114
-//  M =     -0.168736    -0.331264       0.5
-//          0.5          -0.418688       -0.081312
-//
-// Correction vector K:
-//          0
-//  K =    128
-//         128
-//
 void Image::host_rgb2yuv()
 {
         if(_colorSpace == colorSpace::rgb)
@@ -455,12 +461,6 @@ void Image::host_rgb2yuv()
         }
 }
 
-// Analog to RGB->YUV transform, solving the equation for the RGB-vector (values smaller than 1e-5 rounded to 0)
-//      RGB = ( M^(-1) ) x (YUV - K)
-//          1   ~0              1.401999
-//  M^-1 =  1   -0.344136       -0.714136
-//          1   1.772           ~0
-//
 void Image::host_yuv2rgb()
 {       
         if(_colorSpace == colorSpace::yuv)
@@ -488,7 +488,7 @@ void Image::host_yuv2rgb()
         }
 }
 
-// Parse a string in a file to an integer untill a whitespace (ASCII Code 32) or a newline-character is found
+/*// Parse a string in a file to an integer untill a whitespace (ASCII Code 32) or a newline-character is found
 int parseNumber(FILE * file)
 {
     char current_char = fgetc(file);
@@ -618,21 +618,6 @@ void imageToArray (int rows, int cols, int channels, fileType type, FILE * src, 
     
 }
 
-/*inline __device__ double dev_clamp(double x, double min, double max)
-{
-        double y = x;
-        if(x<min)
-        {
-                y = min;
-        }
-        else if(x>=max)
-        {
-                //In order to avoid artifacts because of double to char conversion
-                y = max - 0.1;
-        }
-        return y;
-}*/
-
 __host__ double clamp(double x, double min, double max)
 {
         double y = x;
@@ -648,21 +633,6 @@ __host__ double clamp(double x, double min, double max)
         return y;
 }
 
-/*__device__ int dev_clamp(int x, int min, int max)
-{
-       int y = x;
-       if(x<min)
-        {
-                y = min;
-        }
-        else if(x>=max)
-        {
-                
-                y = max;
-        }
-        return y;
-}*/
-
 __host__ int clamp(int x, int min, int max)
 {
        int y = x;
@@ -676,7 +646,7 @@ __host__ int clamp(int x, int min, int max)
                 y = max;
         }
         return y;
-}
+}*/
 
 __global__ void dev_color2gvp(unsigned char* pixels_ptr, colorSpace color, int rows, int cols)
 { 
@@ -723,25 +693,74 @@ __global__ void dev_rgb2yuv(unsigned char* pixels_ptr, int rows, int cols)
 {
 
         int numPixels = rows*cols;
-        unsigned char r = 0, g = 0, b = 0, y =0, u = 0, v =0;
+        unsigned char r= 0, g = 0, b = 0;
 
         for (int i = blockIdx.x*blockDim.x+threadIdx.x; i < numPixels; i+= blockDim.x*gridDim.x)
         {
                 int j = 3*i;
                 r = pixels_ptr[j];
                 g = pixels_ptr[j+1];
+                b = pixels_ptr[j+2]; 
+                
+                pixels_ptr[j] = dev_clamp( 0.299*r + 0.587*g + 0.114*b);
+                pixels_ptr[j+1] = dev_clamp(-0.168736*r - 0.331264*g + 0.500*b+128);
+                pixels_ptr[j+ 2]  = dev_clamp( 0.5*r - 0.419*g - 0.081*b +128);       
+
+        }
+}
+
+__global__ void dev_rgb2hsv(unsigned char* pixels_ptr, int rows, int cols)
+{
+
+        int numPixels = rows*cols;
+        unsigned char r = 0, g = 0, b = 0, h =0, s = 0, v =0, max=0, min=255;
+
+        for (int i = blockIdx.x*blockDim.x+threadIdx.x; i < numPixels; i+= blockDim.x*gridDim.x)
+        {
+
+                int j = 3*i;
+                r = pixels_ptr[j];
+                g = pixels_ptr[j+1];
                 b = pixels_ptr[j+2];
 
-                // Make sure all values are in the range [0,255]
-                y = dev_clamp( 0.299*r + 0.587*g + 0.114*b);
-                u = dev_clamp(-0.168736*r - 0.331264*g + 0.500*b+128);
-                v = dev_clamp( 0.5*r - 0.419*g - 0.081*b +128);
+                for(int k = 0; k<3; k++)
+                {
+                        unsigned char val =pixels_ptr[j+k];
+                        if(val<min)
+                        {
+                                min=val;
+                        }
+                        if(val>max)
+                        {
+                                max=val;
+                        }
+                }
 
-                pixels_ptr[j]= y;
-                pixels_ptr[j+1] = u;
+                v = max;
+                if(v!=0)
+                {
+                        s = dev_clamp(255*(v - min)/(double)v);
+                }
+
+                if(v == r)
+                {
+                        h=dev_clamp(30*(g-b)/(double)(v - min));
+                }
+                else 
+                if(v == g)
+                {
+                        h=dev_clamp(60 + 30*(b-r)/(double)(v - min));
+                }
+                else
+                {
+                        h = dev_clamp(120 + 30*(r-g)/(double)(v - min));
+                }
+     
+
+                pixels_ptr[j]= h;
+                pixels_ptr[j+1] = s;
                 pixels_ptr[j+ 2] = v;
         }
-        
 }
 
 __global__ void dev_yuv2rgb(unsigned char* pixels_ptr, int rows, int cols)
@@ -757,9 +776,9 @@ __global__ void dev_yuv2rgb(unsigned char* pixels_ptr, int rows, int cols)
                 v = pixels_ptr[j+2];
 
                 // Make sure all values are in the range [0,255]
-                r = dev_clamp(1*y + 1.401999*(v-128));
-                g = dev_clamp(1*y  - 0.344136*(u-128) - 0.714136*(v-128));
-                b = dev_clamp(1*y + 1.772*(u-128));
+                r = dev_clamp(y + 1.401999*(v-128));
+                g = dev_clamp(y  - 0.344136*(u-128) - 0.714136*(v-128));
+                b = dev_clamp(y + 1.772*(u-128));
                 pixels_ptr[j]= r;
                 pixels_ptr[j+1] = g;
                 pixels_ptr[j+ 2] = b;
