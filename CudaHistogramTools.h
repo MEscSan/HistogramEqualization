@@ -33,15 +33,15 @@ class Histogram
     public:
         Histogram(Image& src, int host=0);
 
-        void dev_getHistogram(dim3 blocks = 48, dim3 threadsPerBlock = 128);
+        float dev_getHistogram(dim3 blocks = 48, dim3 threadsPerBlock = 128);
         void host_getHistogram();
         
         void display(ostream& output = cout);    
         
-        void dev_equalize(dim3 blocks = 48, dim3 threadsPerBlock = 128);
+        float dev_equalize(dim3 blocks = 48, dim3 threadsPerBlock = 128);
         void host_equalize();
         
-        void dev_normalize(dim3 blocks = 48, dim3 threadsPerBlock = 128);
+        float dev_normalize(dim3 blocks = 48, dim3 threadsPerBlock = 128);
         void host_normalize();
 
         void save(string path);

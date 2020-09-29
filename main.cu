@@ -63,6 +63,7 @@ int main()
         testMultichannel.save(path.data());
 
     }
+
     end_t = clock();
     total_t = ((double)end_t - (double)start_t)/CLOCKS_PER_SEC;
 
@@ -112,6 +113,21 @@ int main()
     total_t = ((double)end_t - (double)start_t)/CLOCKS_PER_SEC;
 
     cout << total_t<< '\n';
+
+    for (int i = 0; i < 5; i++)
+    {   
+        string path = "../../TestImages/Benchmark/"+ std::to_string(i) +".pgm";
+        Image test(path.data());
+        Histogram hist = Histogram(test);
+        hist.dev_normalize();
+        
+        path = "../../TestImages/Benchmark/Cuda"+ std::to_string(i) +"Normalized";
+        test.save(path.data());
+        
+        hist.dev_equalize();
+        path = "../../TestImages/Benchmark/Cuda"+ std::to_string(i) +"Equalized";    
+        test.save(path.data());
+    }
 
     return EXIT_SUCCESS;
 }

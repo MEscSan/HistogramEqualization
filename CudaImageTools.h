@@ -306,17 +306,17 @@ inline __device__ double dev_clamp(double x, double min = 0, double max = 255)
 
 inline __device__ int dev_clamp (int x, int min = 0, int max = 255)
 {
-           int y = x;
-       if(x<min)
-        {
-                y = min;
-        }
-        else if(x>max)
-        {
-                
-                y = max;
-        }
-        return y;
+    int y = x;
+    if(x<min)
+    {
+            y = min;
+    }
+    else if(x>max)
+    {
+            
+            y = max;
+    }
+    return y;
 }
 
 // Reads the pixel values from the original file and stores them in the image-object as a byte-array 

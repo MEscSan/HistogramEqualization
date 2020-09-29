@@ -42,8 +42,13 @@ Histogram::Histogram(Image& src, int host)
 
 }
 
-void Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
+float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
 {
+    float miliseconds = 0, ms1 = 0, ms2 = 0, ms3 = 0, ms4 = 0, ms5 = 0;
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
     int rows = _src.getRows();
     int cols = _src.getCols();
     int channels = _src.getNumberOfChannels();
@@ -66,7 +71,7 @@ void Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
     // RGB-Images are transformed to YUV-Color space; the histogram-class only takes the y-channel (luminance) into account
     if(_src.getColorSpace()== colorSpace::rgb)
     {
-        _src.dev_rgb2yuv();
+        miliseconds += _src.dev_rgb2yuv(blocks, threadsPerBlock);
     }
 
     // Allocate device memory:
@@ -83,32 +88,59 @@ void Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
     //gpuErrchk( cudaMemcpy(_dev_lookUpTable, _host_lookUpTable, _numValues*sizeof(unsigned char), cudaMemcpyHostToDevice));
    
     // Histogram
+    cudaEventRecord(start);
     partialHistograms<<<blocks, threadsPerBlock, _numValues*sizeof(int)>>>(_dev_pixels, g_partialHistograms, _numValues, rows, cols, channels);
+    cudaEventRecord(stop);
     gpuErrchk(cudaGetLastError());
+
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&ms1, start, stop);
+    
+    cudaEventRecord(start);
     globalHistogram<<<blocks, threadsPerBlock>>>(g_partialHistograms, _dev_values, _numValues, blocks.x);
     gpuErrchk(cudaGetLastError());
+    cudaEventRecord(stop);
+
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&ms2, start, stop);
 
     // Cumulative Histogram:
     // In the next Kernel, each block scans numValues/n elements, n is the size of the padded array (in the case that numValues is not a multiple of the number of blocks)
     int n = _numValues;
     // If the number of array-elements is not a multiple of the number of blocks it is padded to the next one
-    if(n%blocks.x!=0)
+    /*if(n%blocks.x!=0)
     {
         n += blocks.x - n%blocks.x;
-    }
+    }*/
     int nPartial =  128;
 
     gpuErrchk( cudaMalloc((void**)& g_partialCumulative, n*sizeof(int)));
     gpuErrchk( cudaMalloc((void**)& sums, n*sizeof(int)/nPartial));
 
     //partialCumulativeHistograms<<<blocks, threadsPerBlock, n*sizeof(int)/blocks.x>>>(_dev_values, g_partialCumulative, sums, _numValues, n);
-
+    cudaEventRecord(start);
     partialCumulativeHistograms<<<n/nPartial, nPartial/2, nPartial*sizeof(int)>>>(_dev_values, g_partialCumulative, sums, n, nPartial);
+    cudaEventRecord(stop);
     gpuErrchk( cudaGetLastError());
+
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&ms3, start, stop);
+
+    cudaEventRecord(start);
     auxiliaryCumulativeHistogram<<<1, n/(2*nPartial), n*sizeof(int)/nPartial>>>(sums, n/nPartial);
+    cudaEventRecord(stop);
     gpuErrchk( cudaGetLastError());
+
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&ms4, start, stop);
+    
+    cudaEventRecord(start);
     globalCumulativeHistogram<<<blocks, threadsPerBlock>>>(g_partialCumulative, sums, _dev_valuesCumulative, _numValues, nPartial, rows, cols);
+    cudaEventRecord(stop);
     gpuErrchk( cudaGetLastError());
+
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&ms5, start, stop);
 
     gpuErrchk(cudaMemcpy(_host_values, _dev_values, _numValues*sizeof(int), cudaMemcpyDeviceToHost));
     gpuErrchk(cudaMemcpy(_host_valuesCumulative, _dev_valuesCumulative, _numValues*sizeof(double), cudaMemcpyDeviceToHost));
@@ -122,8 +154,11 @@ void Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
     cudaFree(g_partialHistograms);
 
     //Convert back to RGB if necessary
-    _src.dev_yuv2rgb();
+    _src.dev_yuv2rgb(blocks, threadsPerBlock);
 
+    miliseconds += ms1 + ms2 + ms3 + ms4 + ms5;
+
+    return miliseconds;
 }
 
 void Histogram::host_getHistogram()
@@ -195,8 +230,13 @@ void Histogram::display(ostream& output)
     
 }
 
-void Histogram::dev_equalize(dim3 blocks, dim3 threadsPerBlock)
+float Histogram::dev_equalize(dim3 blocks, dim3 threadsPerBlock)
 {
+    float miliseconds = 0, ms1 = 0, ms2 =0;
+    cudaEvent_t start, stop; 
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
     //getHistogram the normalized color-values into a lookup table assuming a minimum value 0 and a maximum equals the number of values
     int rows = _src.getRows();
     int cols = _src.getCols();
@@ -206,7 +246,7 @@ void Histogram::dev_equalize(dim3 blocks, dim3 threadsPerBlock)
 
     if(_src.getColorSpace()==colorSpace::rgb)
     {
-        _src.dev_rgb2yuv();
+        miliseconds += _src.dev_rgb2yuv(blocks, threadsPerBlock);
     }
 
     gpuErrchk(cudaMalloc((void**)& _dev_lookUpTable, _numValues*sizeof(unsigned char)));
@@ -217,10 +257,21 @@ void Histogram::dev_equalize(dim3 blocks, dim3 threadsPerBlock)
     gpuErrchk(cudaMemcpy(_dev_pixels, host_pixelPtr, numPixels*sizeof(unsigned char), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(_dev_valuesCumulative, _host_valuesCumulative, _numValues*sizeof(double),cudaMemcpyHostToDevice));
     
+    cudaEventRecord(start);
     equalizationLookUpTable<<<1, 256, _numValues*sizeof(unsigned char)>>>(_dev_lookUpTable, _dev_valuesCumulative, _numValues);
+    cudaEventRecord(stop);
     gpuErrchk(cudaGetLastError());
+
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&ms1, start, stop);
+
+    cudaEventRecord(start);
     updatePixelsFromLookUp<<<blocks, threadsPerBlock>>>(_dev_pixels, _dev_lookUpTable, rows, cols, channels);
+    cudaEventRecord(stop);
     gpuErrchk(cudaGetLastError());
+
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&ms2, start, stop);
 
     gpuErrchk(cudaMemcpy(_host_lookUpTable, _dev_lookUpTable, _numValues*sizeof(unsigned char), cudaMemcpyDeviceToHost));
     gpuErrchk(cudaMemcpy( host_pixelPtr, _dev_pixels, numPixels*sizeof(unsigned char), cudaMemcpyDeviceToHost));
@@ -230,10 +281,14 @@ void Histogram::dev_equalize(dim3 blocks, dim3 threadsPerBlock)
     cudaFree(_dev_pixels);
     cudaFree(_dev_valuesCumulative);
 
-    dev_getHistogram();
+    miliseconds += ms1 + ms2;
+
+    miliseconds += dev_getHistogram(blocks, threadsPerBlock);
 
     //Transform the image back to RGB-Space if necessary
-     _src.dev_yuv2rgb();
+    miliseconds += _src.dev_yuv2rgb(blocks, threadsPerBlock);
+
+    return miliseconds;
 }
 
 // Source: 2010_Szeleski_Computer Vision, algorithm and Applications, 3.1.4 bzw. 2012_Prince_ComputervisionModelsLearningAndInferenz
@@ -272,8 +327,13 @@ void Histogram::host_equalize()
 
 }
 
-void Histogram::dev_normalize(dim3 blocks, dim3 threadsPerBlock)
+float Histogram::dev_normalize(dim3 blocks, dim3 threadsPerBlock)
 {
+    float miliseconds=0, ms1 = 0, ms2 = 0;
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
     //getHistogram the normalized color-values into a lookup table assuming a minimum value 0 and a maximum equals the number of values
     int rows = _src.getRows();
     int cols = _src.getCols();
@@ -286,7 +346,7 @@ void Histogram::dev_normalize(dim3 blocks, dim3 threadsPerBlock)
 
     if(_src.getColorSpace()==colorSpace::rgb)
     {
-        _src.dev_rgb2yuv();
+        miliseconds += _src.dev_rgb2yuv(blocks, threadsPerBlock);
     }
 
     gpuErrchk(cudaMalloc((void**)& _dev_lookUpTable, _numValues*sizeof(unsigned char)));
@@ -295,10 +355,21 @@ void Histogram::dev_normalize(dim3 blocks, dim3 threadsPerBlock)
     gpuErrchk(cudaMemcpy(_dev_lookUpTable, _host_lookUpTable, _numValues*sizeof(unsigned char), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(_dev_pixels, host_pixelPtr, numPixels*sizeof(unsigned char), cudaMemcpyHostToDevice));
     
+    cudaEventRecord(start);
     normalizationLookUpTable<<<1, 256, _numValues*sizeof(unsigned char)>>>(_dev_lookUpTable,_numValues, maxPixel, minPixel);
+    cudaEventRecord(stop);
     gpuErrchk(cudaGetLastError());
+
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&ms1, start, stop);
+
+    cudaEventRecord(start);
     updatePixelsFromLookUp<<<blocks, threadsPerBlock>>>(_dev_pixels, _dev_lookUpTable, rows, cols, channels);
+    cudaEventRecord(stop);
     gpuErrchk(cudaGetLastError());
+
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&ms2, start, stop);
 
     gpuErrchk(cudaMemcpy(_host_lookUpTable, _dev_lookUpTable, _numValues*sizeof(unsigned char), cudaMemcpyDeviceToHost));
     gpuErrchk(cudaMemcpy( host_pixelPtr, _dev_pixels, numPixels*sizeof(unsigned char), cudaMemcpyDeviceToHost));
@@ -306,9 +377,13 @@ void Histogram::dev_normalize(dim3 blocks, dim3 threadsPerBlock)
     cudaFree(_dev_lookUpTable);
     cudaFree(_dev_pixels); 
 
-    dev_getHistogram();
+    miliseconds += ms1 + ms2;
 
-    _src.dev_yuv2rgb();
+    miliseconds += dev_getHistogram(blocks, threadsPerBlock);
+
+    miliseconds +=_src.dev_yuv2rgb(blocks, threadsPerBlock);
+
+    return miliseconds;
 }
 
 // Normalize Histogram, Source:2012_Nixon_FeaturesExtraction, 3.3.2 Histogram normalization
