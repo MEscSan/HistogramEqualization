@@ -10,6 +10,7 @@ set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Wno-deprecated-gpu-targets")
 
 add_executable(main main.cpp ImageTools.cpp HistogramTools.cpp)
 add_executable(mainCuda main.cu CudaImageTools.cu CudaHistogramTools.cu)
+add_executable(HistogramBenchmarking HistogramBenchmarking.cu CudaImageTools.cu CudaHistogramTools.cu)
 
 
 

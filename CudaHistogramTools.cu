@@ -33,23 +33,23 @@ Histogram::Histogram(Image& src, int host)
 
     if(host)
     {
-        host_calculate();
+        host_getHistogram();
     }
     else
     {
-        calculate();
+        dev_getHistogram();
     }
 
 }
 
-void Histogram::calculate(dim3 blocks, dim3 threadsPerBlock)
+void Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
 {
     int rows = _src.getRows();
     int cols = _src.getCols();
     int channels = _src.getNumberOfChannels();
     double numPixels = rows*cols*channels;
 
-    unsigned char* pixelPtr = (unsigned char*)_src.getPixelPtr();
+    unsigned char* pixelPtr = (unsigned char*)_src.getHostPixelPtr();
     int* g_partialHistograms;
     int* g_partialCumulative;
     int* sums;
@@ -66,7 +66,7 @@ void Histogram::calculate(dim3 blocks, dim3 threadsPerBlock)
     // RGB-Images are transformed to YUV-Color space; the histogram-class only takes the y-channel (luminance) into account
     if(_src.getColorSpace()== colorSpace::rgb)
     {
-        _src.rgb2yuv();
+        _src.dev_rgb2yuv();
     }
 
     // Allocate device memory:
@@ -77,7 +77,7 @@ void Histogram::calculate(dim3 blocks, dim3 threadsPerBlock)
  
     //gpuErrchk( cudaMalloc((void**)& _dev_lookUpTable, _numValues*sizeof(unsigned char)));
 
-    gpuErrchk( cudaMemcpy(_dev_pixels, _src.getPixelPtr(), numPixels*sizeof(unsigned char), cudaMemcpyHostToDevice));
+    gpuErrchk( cudaMemcpy(_dev_pixels, _src.getHostPixelPtr(), numPixels*sizeof(unsigned char), cudaMemcpyHostToDevice));
     gpuErrchk( cudaMemcpy(_dev_values, _host_values, _numValues*sizeof(int), cudaMemcpyHostToDevice));
     gpuErrchk( cudaMemcpy(_dev_valuesCumulative, _host_valuesCumulative, _numValues*sizeof(double), cudaMemcpyHostToDevice));
     //gpuErrchk( cudaMemcpy(_dev_lookUpTable, _host_lookUpTable, _numValues*sizeof(unsigned char), cudaMemcpyHostToDevice));
@@ -122,25 +122,25 @@ void Histogram::calculate(dim3 blocks, dim3 threadsPerBlock)
     cudaFree(g_partialHistograms);
 
     //Convert back to RGB if necessary
-    _src.yuv2rgb();
+    _src.dev_yuv2rgb();
 
 }
 
-void Histogram::host_calculate()
+void Histogram::host_getHistogram()
 {
     int rows = _src.getRows();
     int cols = _src.getCols();
     int channels = _src.getNumberOfChannels();
     double numPixels = rows*cols*channels;
 
-    unsigned char* pixelPtr = (unsigned char*)_src.getPixelPtr();
+    unsigned char* pixelPtr = (unsigned char*)_src.getHostPixelPtr();
     unsigned char value = 0;
  
     //Reset _host_values-array and _lookupTable with 0s
     for (int i = 0; i < _numValues; i++)
     {
         _host_values[i]=0;
-        //_host_lookUpTable[i]=0;
+        _host_lookUpTable[i]=0;
         _host_valuesCumulative[i]=0;
     }
 
@@ -185,7 +185,7 @@ void Histogram::display(ostream& output)
     for (int i = 0; i < _numValues; i++)
     {
         output << i << "\t|"; 
-        normValue = (int)200*(_host_values[i]/(float)maxVal);
+        normValue = (int)100*(_host_values[i]/(float)maxVal);
         for (int j = 0; j < normValue; j++)
         {
             output << '*';
@@ -195,18 +195,18 @@ void Histogram::display(ostream& output)
     
 }
 
-void Histogram::equalize(dim3 blocks, dim3 threadsPerBlock)
+void Histogram::dev_equalize(dim3 blocks, dim3 threadsPerBlock)
 {
-    //Calculate the normalized color-values into a lookup table assuming a minimum value 0 and a maximum equals the number of values
+    //getHistogram the normalized color-values into a lookup table assuming a minimum value 0 and a maximum equals the number of values
     int rows = _src.getRows();
     int cols = _src.getCols();
     int channels = _src.getNumberOfChannels();
     int numPixels = rows*cols*channels;
-    unsigned char* host_pixelPtr = (unsigned char*)_src.getPixelPtr(); 
+    unsigned char* host_pixelPtr = (unsigned char*)_src.getHostPixelPtr(); 
 
     if(_src.getColorSpace()==colorSpace::rgb)
     {
-        _src.rgb2yuv();
+        _src.dev_rgb2yuv();
     }
 
     gpuErrchk(cudaMalloc((void**)& _dev_lookUpTable, _numValues*sizeof(unsigned char)));
@@ -230,10 +230,10 @@ void Histogram::equalize(dim3 blocks, dim3 threadsPerBlock)
     cudaFree(_dev_pixels);
     cudaFree(_dev_valuesCumulative);
 
-    calculate();
+    dev_getHistogram();
 
     //Transform the image back to RGB-Space if necessary
-     _src.yuv2rgb();
+     _src.dev_yuv2rgb();
 }
 
 // Source: 2010_Szeleski_Computer Vision, algorithm and Applications, 3.1.4 bzw. 2012_Prince_ComputervisionModelsLearningAndInferenz
@@ -243,12 +243,12 @@ void Histogram::host_equalize()
     int cols = _src.getCols();
     int channels = _src.getNumberOfChannels();
     int numPixels = rows*cols*channels;
-    unsigned char* pixelPtr = (unsigned char*)_src.getPixelPtr();
+    unsigned char* pixelPtr = (unsigned char*)_src.getHostPixelPtr();
 
-    // The normalized cumulative histogram is used as a lookup-table to calculate the new color values
+    // The normalized cumulative histogram is used as a lookup-table to getHistogram the new color values
     for (int i = 0; i < _numValues; i++)
     {
-        _host_lookUpTable[i] = clamp( _numValues*_host_valuesCumulative[i]);
+        _host_lookUpTable[i] = host_clamp( _numValues*_host_valuesCumulative[i]);
 
     }
 
@@ -264,114 +264,29 @@ void Histogram::host_equalize()
         pixelPtr[i] = newPixelVal; 
     }
 
-    //Calculate new Histogram
-    host_calculate();
+    //getHistogram new Histogram
+    host_getHistogram();
 
     //Transform the image back to RGB-Space if necessary
     _src.host_yuv2rgb();
 
 }
 
-// Gets the maxmimum histogram-value
-int getMax(int* arrayPtr, int arraySize, colorSpace cs)
+void Histogram::dev_normalize(dim3 blocks, dim3 threadsPerBlock)
 {
-    int maxVal = 0;
-
-    if(cs == colorSpace::gvp)
-    {
-        for (int i = 0; i < arraySize; i++)
-        {
-            if(arrayPtr[i] > maxVal)
-            {
-                maxVal = arrayPtr[i];
-            }
-        }
-    }
-    else
-    {
-        for (int i = 0; i < arraySize; i+=3)
-        {
-            if(arrayPtr[i] > maxVal)
-            {
-                maxVal = arrayPtr[i];
-            }
-        }
-    }
-    return maxVal;
-}
-
-unsigned char getMax(unsigned char* arrayPtr, int arraySize, colorSpace cs)
-{
-    unsigned char maxVal = 0;
-
-    if(cs == colorSpace::gvp)
-    {
-        for (int i = 0; i < arraySize; i++)
-        {
-            if(arrayPtr[i] > maxVal)
-            {
-                maxVal = arrayPtr[i];
-            }
-        }
-    }
-    else
-    {
-        for (int i = 0; i < arraySize; i+=3)
-        {
-            if(arrayPtr[i] > maxVal)
-            {
-                maxVal = arrayPtr[i];
-            }
-        }
-    }
-    
-    
-    return maxVal;
-}
-
-unsigned char getMin(unsigned char* arrayPtr, int arraySize, colorSpace cs)
-{
-    unsigned char minVal = _SC_UCHAR_MAX;
-
-    if(cs == colorSpace::gvp)
-    {
-        for (int i = 0; i < arraySize; i++)
-        {
-            if(arrayPtr[i] < minVal)
-            {
-                minVal = arrayPtr[i];
-            }
-        }        
-    }
-    else
-    {
-        for (int i = 0; i < arraySize; i+=3)
-        {
-            if(arrayPtr[i] < minVal)
-            {
-                minVal = arrayPtr[i];
-            }
-        }
-    }
-    
-    return minVal;
-}
-
-void Histogram::normalize(dim3 blocks, dim3 threadsPerBlock)
-{
-    //Calculate the normalized color-values into a lookup table assuming a minimum value 0 and a maximum equals the number of values
+    //getHistogram the normalized color-values into a lookup table assuming a minimum value 0 and a maximum equals the number of values
     int rows = _src.getRows();
     int cols = _src.getCols();
     int channels = _src.getNumberOfChannels();
     int numPixels = rows*cols*channels;
-    unsigned char* host_pixelPtr = (unsigned char*)_src.getPixelPtr(); 
+    unsigned char* host_pixelPtr = (unsigned char*)_src.getHostPixelPtr(); 
 
     unsigned char maxPixel = getMax(host_pixelPtr, numPixels, _src.getColorSpace());
     unsigned char minPixel = getMin(host_pixelPtr, numPixels, _src.getColorSpace());
 
     if(_src.getColorSpace()==colorSpace::rgb)
     {
-        _src.rgb2yuv();
+        _src.dev_rgb2yuv();
     }
 
     gpuErrchk(cudaMalloc((void**)& _dev_lookUpTable, _numValues*sizeof(unsigned char)));
@@ -391,20 +306,20 @@ void Histogram::normalize(dim3 blocks, dim3 threadsPerBlock)
     cudaFree(_dev_lookUpTable);
     cudaFree(_dev_pixels); 
 
-    calculate();
+    dev_getHistogram();
 
-    _src.yuv2rgb();
+    _src.dev_yuv2rgb();
 }
 
 // Normalize Histogram, Source:2012_Nixon_FeaturesExtraction, 3.3.2 Histogram normalization
 void Histogram::host_normalize()
 {
-    //Calculate the normalized color-values into a lookup table assuming a minimum value 0 and a maximum equals the number of values
+    //getHistogram the normalized color-values into a lookup table assuming a minimum value 0 and a maximum equals the number of values
     int rows = _src.getRows();
     int cols = _src.getCols();
     int channels = _src.getNumberOfChannels();
     int numPixels = rows*cols*channels;
-    unsigned char* pixelPtr = (unsigned char*)_src.getPixelPtr(); 
+    unsigned char* pixelPtr = (unsigned char*)_src.getHostPixelPtr(); 
 
     unsigned char maxPixel = getMax(pixelPtr, numPixels, _src.getColorSpace());
     unsigned char minPixel = getMin(pixelPtr, numPixels, _src.getColorSpace());
@@ -412,7 +327,7 @@ void Histogram::host_normalize()
     // Create Lookup-table
     for (int i = 0; i < _numValues; i++)
     {
-        _host_lookUpTable[i] = clamp(_numValues*(i - minPixel)/(double)(maxPixel-minPixel));           
+        _host_lookUpTable[i] = host_clamp(_numValues*(i - minPixel)/(double)(maxPixel-minPixel));           
     }
     
     // Normalize image
@@ -428,8 +343,8 @@ void Histogram::host_normalize()
         pixelPtr[i] = newPixelVal; 
     }
 
-    //Calculate new Histogram
-    host_calculate();
+    //getHistogram new Histogram
+    host_getHistogram();
 
     //Transform the image back to RGB-Space if necessary
     _src.host_yuv2rgb();
@@ -550,12 +465,6 @@ __global__ void partialCumulativeHistograms(int* values, int* g_partialCumulativ
         s_partialCumulative[i*2] = values[2*globalThreadIdx];
         s_partialCumulative[i*2 + 1] = values[2*globalThreadIdx + 1];
 
-        /*int a = i + CONFLICT_FREE_OFFSET(i);
-        int b = i + nPartial>>1;
-        b += CONFLICT_FREE_OFFSET(b);
-        
-        s_partialCumulative[a] = values[globalThreadIdx];
-        s_partialCumulative[b] = values[globalThreadIdx + nPartial/2];*/
     }
     __syncthreads();
     
@@ -568,14 +477,12 @@ __global__ void partialCumulativeHistograms(int* values, int* g_partialCumulativ
             int a = offset*(2*localThreadIdx+1)-1;     
             int b = offset*(2*localThreadIdx+2)-1;  
 
-            /*a += CONFLICT_FREE_OFFSET(a);
-            b += CONFLICT_FREE_OFFSET(b);*/
-
             s_partialCumulative[b] += s_partialCumulative[a];    
         }    
         offset *= 2; 
     } 
-    
+    __syncthreads();  
+
     // Clear the last element  
     if (localThreadIdx == 0) 
     { 
@@ -585,7 +492,6 @@ __global__ void partialCumulativeHistograms(int* values, int* g_partialCumulativ
     } 
     
     // Down-Sweep Phase of the Sum-Scan-Algorithm
-    //for (int d = 1; d < (n/gridDim.x); d *= 2)
     for (int d = 1; d < nPartial; d *= 2)
     {      
         offset >>= 1;      
@@ -595,9 +501,6 @@ __global__ void partialCumulativeHistograms(int* values, int* g_partialCumulativ
             int a = offset*(2*localThreadIdx+1)-1;     
             int b = offset*(2*localThreadIdx+2)-1; 
              
-            /*a += CONFLICT_FREE_OFFSET(a);
-            b += CONFLICT_FREE_OFFSET(b);
-            */
             int t = s_partialCumulative[a]; 
             s_partialCumulative[a] = s_partialCumulative[b]; 
             s_partialCumulative[b] += t;       
@@ -691,8 +594,7 @@ __global__ void globalCumulativeHistogram(int* g_partialCumulative, int* sums, d
 
     for( int i = globalThreadIdx; i<numValues; i+= globalNumThreads )
     {
-        _dev_valuesCumulative[i] = (g_partialCumulative[i] + sums[i/nPartial])/(double) ( rows*rows );
-        //_dev_valuesCumulative[i] = (g_partialCumulative[i]);
+        _dev_valuesCumulative[i] = (g_partialCumulative[i] + sums[i/nPartial])/(double) ( rows*cols );
     }
 }
 
@@ -737,7 +639,6 @@ __global__ void equalizationLookUpTable(unsigned char* dev_lookUpTable, double* 
     }
 }
 
-
 __global__ void updatePixelsFromLookUp( unsigned char* pixelPtr, unsigned char* dev_lookUpTable, int rows, int cols, int channels)
 {
     int globalThreadIdx = threadIdx.x + blockIdx.x*blockDim.x;
@@ -745,8 +646,10 @@ __global__ void updatePixelsFromLookUp( unsigned char* pixelPtr, unsigned char* 
 
     for(int i = globalThreadIdx; i<rows*cols; i+=globalNumThreads)
     {
-        unsigned char oldPixelVal = pixelPtr[i*channels];
-        pixelPtr[i*channels] = dev_lookUpTable[oldPixelVal];
+        int j = i*channels;
+        unsigned char oldPixelVal = pixelPtr[j];
+        unsigned char newPixelVal = dev_lookUpTable[oldPixelVal];
+        pixelPtr[j] = newPixelVal;
     }
 
 }

@@ -13,7 +13,6 @@
 
 using namespace std;
 
-//TODO: Implement RGB-handling
 class Histogram
 {
     private:
@@ -34,30 +33,110 @@ class Histogram
     public:
         Histogram(Image& src, int host=0);
 
-        void calculate(dim3 blocks = 48, dim3 threadsPerBlock = 128);
-        void host_calculate();
+        void dev_getHistogram(dim3 blocks = 48, dim3 threadsPerBlock = 128);
+        void host_getHistogram();
         
         void display(ostream& output = cout);    
         
-        void equalize(dim3 blocks = 48, dim3 threadsPerBlock = 128);
+        void dev_equalize(dim3 blocks = 48, dim3 threadsPerBlock = 128);
         void host_equalize();
         
-        int* getHistogramPtr();
-        
-        void normalize(dim3 blocks = 48, dim3 threadsPerBlock = 128);
+        void dev_normalize(dim3 blocks = 48, dim3 threadsPerBlock = 128);
         void host_normalize();
 
         void save(string path);
 
 };
 
-int getMax(int* arrayPtr, int arraySize, colorSpace cs = colorSpace::gvp);
-unsigned char getMax(unsigned char* arrayPtr, int arraySize, colorSpace cs = colorSpace::gvp);
+// Gets the maxmimum histogram-value
+inline int getMax(int* arrayPtr, int arraySize, colorSpace cs = colorSpace::gvp)
+{
+    int maxVal = 0;
+
+    if(cs == colorSpace::gvp)
+    {
+        for (int i = 0; i < arraySize; i++)
+        {
+            if(arrayPtr[i] > maxVal)
+            {
+                maxVal = arrayPtr[i];
+            }
+        }
+    }
+    else
+    {
+        for (int i = 0; i < arraySize; i+=3)
+        {
+            if(arrayPtr[i] > maxVal)
+            {
+                maxVal = arrayPtr[i];
+            }
+        }
+    }
+    return maxVal;
+}
+
+inline unsigned char getMax(unsigned char* arrayPtr, int arraySize, colorSpace cs = colorSpace::gvp)
+{
+    unsigned char maxVal = 0;
+
+    if(cs == colorSpace::gvp)
+    {
+        for (int i = 0; i < arraySize; i++)
+        {
+            if(arrayPtr[i] > maxVal)
+            {
+                maxVal = arrayPtr[i];
+            }
+        }
+    }
+    else
+    {
+        for (int i = 0; i < arraySize; i+=3)
+        {
+            if(arrayPtr[i] > maxVal)
+            {
+                maxVal = arrayPtr[i];
+            }
+        }
+    }
+    
+    
+    return maxVal;
+}
+
+inline unsigned char getMin(unsigned char* arrayPtr, int arraySize, colorSpace cs = colorSpace::gvp)
+{
+    unsigned char minVal = _SC_UCHAR_MAX;
+
+    if(cs == colorSpace::gvp)
+    {
+        for (int i = 0; i < arraySize; i++)
+        {
+            if(arrayPtr[i] < minVal)
+            {
+                minVal = arrayPtr[i];
+            }
+        }        
+    }
+    else
+    {
+        for (int i = 0; i < arraySize; i+=3)
+        {
+            if(arrayPtr[i] < minVal)
+            {
+                minVal = arrayPtr[i];
+            }
+        }
+    }
+    
+    return minVal;
+}
 
 __device__ int dev_getMax(int* arrayPtr, int arraySize, colorSpace cs = colorSpace::gvp);
 __device__ unsigned char dev_getMax(unsigned char* arrayPtr, int arraySize, colorSpace cs = colorSpace::gvp);
 
-__global__ void dev_calculate(unsigned char* pixelPtr, int* values, double* valuesCumulative, unsigned char* lookUpTable,  int rows, int cols, colorSpace color);
+__global__ void getHistogram(unsigned char* pixelPtr, int* values, double* valuesCumulative, unsigned char* lookUpTable,  int rows, int cols, colorSpace color);
 
 // Implements a one-dimensional version of the local-histograms-kernel proposed in https://developer.nvidia.com/blog/gpu-pro-tip-fast-histograms-using-shared-atomics-maxwell/
 __global__ void partialHistograms(unsigned char* pixelPtr, int* g_partialHistograms,int numValues, int rows, int cols, int channels);
