@@ -31,7 +31,7 @@ void ColorConversionBenchmarking(dim3 blocks, dim3 threadsPerBlock)
     for (int i = 0; i < 21; i++)
     {   
         cout.precision(5);
-        string path = "../../TestImages/Benchmark/"+ std::to_string(i) +".ppm";
+        string path = "../../Benchmark/"+ std::to_string(i) +".ppm";
         Image test(path.data());
         double miliseconds = 0;
 
@@ -62,7 +62,7 @@ void ColorConversionBenchmarking(dim3 blocks, dim3 threadsPerBlock)
     cout <<"CPU  RGB <-> YCrCb Conversion: " << cpu_RGB2YCbCrTime/N << " ms/pixel\n";
     
     double speedUp = 100*cpu_RGB2YCbCrTime/cuda_RGB2YCbCrTime ;
-    cout << "\nSpeedup(Cuda-Device with respect to CPU): " << speedUp << "%\n\n";
+    cout << "Speedup(Cuda-Device with respect to CPU): " << speedUp << "%\n\n";
 
     // Theoretical Memory Throughput[Gb/s]: 2*CUDA-Device clock-Rate[Hz] * busWidth[bytes]/1.0e9
     int clockRate_kHz;
@@ -92,7 +92,7 @@ void RGB_HistogramOperationsBenchmarking(dim3 blocks, dim3 threadsPerBlock)
     for (int i = 0; i < 21; i++)
     {   
         cout.precision(5);
-        string path = "../../TestImages/Benchmark/"+ std::to_string(i) +".ppm";
+        string path = "../../Benchmark/"+ std::to_string(i) +".ppm";
         Image test(path.data());
         Histogram hist(test);
         double miliseconds = 0;
@@ -121,7 +121,7 @@ void RGB_HistogramOperationsBenchmarking(dim3 blocks, dim3 threadsPerBlock)
     cout <<"CPU  Histogram Equalisierung: " << cpu_histogramTime/N << " ms/pixel\n";
     
     double speedUp = 100*cpu_histogramTime/cuda_histogramTime;
-    cout << "\nSpeedup(Cuda-Device with respect to CPU): " << speedUp << "%\n\n";
+    cout << "Speedup(Cuda-Device with respect to CPU): " << speedUp << "%\n\n";
 }
 
 void GVP_HistogramOperationsBenchmarking(dim3 blocks, dim3 threadsPerBlock)
@@ -133,12 +133,12 @@ void GVP_HistogramOperationsBenchmarking(dim3 blocks, dim3 threadsPerBlock)
     double cpu_histogramTime = 0;
     double cuda_histogramTime = 0; 
  
-    cout << "Grey Value:\n";
+    cout << "\nGrey Value:\n";
 
     for (int i = 0; i < 21; i++)
     {   
         cout.precision(5);
-        string path = "../../TestImages/Benchmark/"+ std::to_string(i) +".pgm";
+        string path = "../../Benchmark/"+ std::to_string(i) +".pgm";
         Image test(path.data());
         Histogram hist(test);
         double miliseconds = 0;
@@ -167,12 +167,11 @@ void GVP_HistogramOperationsBenchmarking(dim3 blocks, dim3 threadsPerBlock)
     cout <<"CPU  Histogram Equalisierung: " << cpu_histogramTime/N << " ms/pixel\n";
     
     double speedUp = 100*cpu_histogramTime/cuda_histogramTime;
-    cout << "\nSpeedup(Cuda-Device with respect to CPU): " << speedUp << "%\n\n";
+    cout << "Speedup(Cuda-Device with respect to CPU): " << speedUp << "%\n\n";
 }
 
 int main()
 {
-    
     int numSM;
     int maxThreadsPerSM;
     cudaDeviceGetAttribute(&numSM, cudaDevAttrMultiProcessorCount, 0);

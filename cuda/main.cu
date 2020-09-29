@@ -27,7 +27,7 @@ int main()
  
     for (int i = 0; i < 21; i++)
     {   
-        string path = "../../TestImages/Benchmark/"+ std::to_string(i) +".ppm";
+        string path = "../Benchmark/"+ std::to_string(i) +".ppm";
         Image test(path.data());
         Image testR = test.getChannel(0);
         Image testG = test.getChannel(1);
@@ -42,9 +42,9 @@ int main()
         histG.dev_normalize();
         histB.dev_normalize();
         
-        path = "../../TestImages/Benchmark/Cuda"+ std::to_string(i) +"Normalized";
+        path = "../Benchmark/Cuda"+ std::to_string(i) +"Normalized";
         test.save(path.data());
-        path = "../../TestImages/Benchmark/Cuda"+ std::to_string(i) +"Normalized_RGB";
+        path = "../Benchmark/Cuda"+ std::to_string(i) +"Normalized_RGB";
         testMultichannel.setChannel(testR, 0);
         testMultichannel.setChannel(testG, 1);
         testMultichannel.setChannel(testB, 2);
@@ -54,9 +54,9 @@ int main()
         histR.dev_equalize();
         histG.dev_equalize();
         histB.dev_equalize();
-        path = "../../TestImages/Benchmark/Cuda"+ std::to_string(i) +"Equalized";    
+        path = "../Benchmark/Cuda"+ std::to_string(i) +"Equalized";    
         test.save(path.data());
-        path = "../../TestImages/Benchmark/Cuda"+ std::to_string(i) +"Equalized_RGB";
+        path = "..//Benchmark/Cuda"+ std::to_string(i) +"Equalized_RGB";
         testMultichannel.setChannel(testR, 0);
         testMultichannel.setChannel(testG, 1);
         testMultichannel.setChannel(testB, 2);
@@ -74,7 +74,7 @@ int main()
 
     for (int i = 0; i < 21; i++)
     {   
-        string path = "../../TestImages/Benchmark/"+ std::to_string(i) +".ppm";
+        string path = "../Benchmark/"+ std::to_string(i) +".ppm";
         Image test(path.data());
         Image testR = test.getChannel(0);
         Image testG = test.getChannel(1);
@@ -89,9 +89,9 @@ int main()
         histG.host_normalize();
         histB.host_normalize();
         
-        path = "../../TestImages/Benchmark/Cpu"+ std::to_string(i) +"Normalized";
+        path = "../Benchmark/Cpu"+ std::to_string(i) +"Normalized";
         test.save(path.data());
-        path = "../../TestImages/Benchmark/Cpu"+ std::to_string(i) +"Normalized_RGB";
+        path = "../Benchmark/Cpu"+ std::to_string(i) +"Normalized_RGB";
         testMultichannel.setChannel(testR, 0);
         testMultichannel.setChannel(testG, 1);
         testMultichannel.setChannel(testB, 2);
@@ -101,9 +101,9 @@ int main()
         histR.host_equalize();
         histG.host_equalize();
         histB.host_equalize();
-        path = "../../TestImages/Benchmark/Cpu"+ std::to_string(i) +"Equalized";    
+        path = "../Benchmark/Cpu"+ std::to_string(i) +"Equalized";    
         test.save(path.data());
-        path = "../../TestImages/Benchmark/Cpu"+ std::to_string(i) +"Equalized_RGB";
+        path = "../Benchmark/Cpu"+ std::to_string(i) +"Equalized_RGB";
         testMultichannel.setChannel(testR, 0);
         testMultichannel.setChannel(testG, 1);
         testMultichannel.setChannel(testB, 2);
@@ -116,16 +116,16 @@ int main()
 
     for (int i = 0; i < 21; i++)
     {   
-        string path = "../../TestImages/Benchmark/"+ std::to_string(i) +".pgm";
+        string path = "../Benchmark/"+ std::to_string(i) +".pgm";
         Image test(path.data());
         Histogram hist = Histogram(test);
         hist.dev_normalize();
         
-        path = "../../TestImages/Benchmark/Cuda"+ std::to_string(i) +"Normalized";
+        path = "../Benchmark/Cuda"+ std::to_string(i) +"Normalized";
         test.save(path.data());
         
         hist.dev_equalize();
-        path = "../../TestImages/Benchmark/Cuda"+ std::to_string(i) +"Equalized";    
+        path = "../Benchmark/Cuda"+ std::to_string(i) +"Equalized";    
         test.save(path.data());
     }
 
