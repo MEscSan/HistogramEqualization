@@ -16,6 +16,8 @@
 
 using namespace std;
 
+
+// Equalizes and Normalizes Becnhmark-Images using the methods and classes implemented in the project
 int main()
 {
     cout << "GPU Test: ";

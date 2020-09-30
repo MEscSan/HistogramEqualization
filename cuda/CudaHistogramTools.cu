@@ -79,13 +79,11 @@ float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
     gpuErrchk( cudaMalloc((void**)& _dev_values, _numValues*sizeof(int)));
     gpuErrchk( cudaMalloc((void**)& _dev_valuesCumulative, _numValues*sizeof(double)));    
     gpuErrchk( cudaMalloc((void**)& g_partialHistograms, _numValues*blocks.x*sizeof(int)));
- 
-    //gpuErrchk( cudaMalloc((void**)& _dev_lookUpTable, _numValues*sizeof(unsigned char)));
+
 
     gpuErrchk( cudaMemcpy(_dev_pixels, _src.getHostPixelPtr(), numPixels*sizeof(unsigned char), cudaMemcpyHostToDevice));
     gpuErrchk( cudaMemcpy(_dev_values, _host_values, _numValues*sizeof(int), cudaMemcpyHostToDevice));
     gpuErrchk( cudaMemcpy(_dev_valuesCumulative, _host_valuesCumulative, _numValues*sizeof(double), cudaMemcpyHostToDevice));
-    //gpuErrchk( cudaMemcpy(_dev_lookUpTable, _host_lookUpTable, _numValues*sizeof(unsigned char), cudaMemcpyHostToDevice));
    
     // Histogram
     cudaEventRecord(start);
@@ -107,17 +105,11 @@ float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
     // Cumulative Histogram:
     // In the next Kernel, each block scans numValues/n elements, n is the size of the padded array (in the case that numValues is not a multiple of the number of blocks)
     int n = _numValues;
-    // If the number of array-elements is not a multiple of the number of blocks it is padded to the next one
-    /*if(n%blocks.x!=0)
-    {
-        n += blocks.x - n%blocks.x;
-    }*/
     int nPartial =  128;
 
     gpuErrchk( cudaMalloc((void**)& g_partialCumulative, n*sizeof(int)));
     gpuErrchk( cudaMalloc((void**)& sums, n*sizeof(int)/nPartial));
 
-    //partialCumulativeHistograms<<<blocks, threadsPerBlock, n*sizeof(int)/blocks.x>>>(_dev_values, g_partialCumulative, sums, _numValues, n);
     cudaEventRecord(start);
     partialCumulativeHistograms<<<n/nPartial, nPartial/2, nPartial*sizeof(int)>>>(_dev_values, g_partialCumulative, sums, n, nPartial);
     cudaEventRecord(stop);
@@ -144,7 +136,6 @@ float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
 
     gpuErrchk(cudaMemcpy(_host_values, _dev_values, _numValues*sizeof(int), cudaMemcpyDeviceToHost));
     gpuErrchk(cudaMemcpy(_host_valuesCumulative, _dev_valuesCumulative, _numValues*sizeof(double), cudaMemcpyDeviceToHost));
-    //gpuErrchk(cudaMemcpy(_host_lookUpTable, _dev_lookUpTable, _numValues*sizeof(unsigned char), cudaMemcpyDeviceToHost));
 
     cudaFree(_dev_pixels);
     cudaFree(_dev_values);
@@ -237,7 +228,7 @@ float Histogram::dev_equalize(dim3 blocks, dim3 threadsPerBlock)
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
-    //getHistogram the normalized color-values into a lookup table assuming a minimum value 0 and a maximum equals the number of values
+    //Load the normalized color-values into a lookup table assuming a minimum value 0 and a maximum equals the number of values
     int rows = _src.getRows();
     int cols = _src.getCols();
     int channels = _src.getNumberOfChannels();
@@ -291,7 +282,7 @@ float Histogram::dev_equalize(dim3 blocks, dim3 threadsPerBlock)
     return miliseconds;
 }
 
-// Source: 2010_Szeleski_Computer Vision, algorithm and Applications, 3.1.4 bzw. 2012_Prince_ComputervisionModelsLearningAndInferenz
+// Source: 2010_Szeleski_Computer Vision, algorithm and Applications, 3.1.4 
 void Histogram::host_equalize()
 {
     int rows = _src.getRows();
@@ -334,7 +325,6 @@ float Histogram::dev_normalize(dim3 blocks, dim3 threadsPerBlock)
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
-    //getHistogram the normalized color-values into a lookup table assuming a minimum value 0 and a maximum equals the number of values
     int rows = _src.getRows();
     int cols = _src.getCols();
     int channels = _src.getNumberOfChannels();
@@ -386,10 +376,10 @@ float Histogram::dev_normalize(dim3 blocks, dim3 threadsPerBlock)
     return miliseconds;
 }
 
-// Normalize Histogram, Source:2012_Nixon_FeaturesExtraction, 3.3.2 Histogram normalization
+// Normalize Histogram
 void Histogram::host_normalize()
 {
-    //getHistogram the normalized color-values into a lookup table assuming a minimum value 0 and a maximum equals the number of values
+    
     int rows = _src.getRows();
     int cols = _src.getCols();
     int channels = _src.getNumberOfChannels();
@@ -588,11 +578,6 @@ __global__ void partialCumulativeHistograms(int* values, int* g_partialCumulativ
     //for(int i = localThreadIdx; i < n/gridDim.x; i+=localNumThreads)
     for(int i = localThreadIdx; i < nPartial - 1; i+=localNumThreads)
     {
-        /*int a = i + CONFLICT_FREE_OFFSET(i) + 1;
-        int b = i + nPartial>>1;
-        int bankOffsetB =  CONFLICT_FREE_OFFSET(b);
-        g_partialCumulative[i] = s_partialCumulative[a];
-        g_partialCumulative[b] = s_partialCumulative[b+bankOffsetB];*/
 
         g_partialCumulative[i] = s_partialCumulative[i+1];
     }
@@ -601,8 +586,6 @@ __global__ void partialCumulativeHistograms(int* values, int* g_partialCumulativ
 __global__ void auxiliaryCumulativeHistogram(int* sums,  int n)
 {
    //Apply parallel Scan-Sum ALgorithm to the sums-array containing the sums of the partial cumulative histograms using global memory
-
-
     extern __shared__ int s_sums[];
     int localThreadIdx = threadIdx.x;
     int localNumThreads = blockDim.x;

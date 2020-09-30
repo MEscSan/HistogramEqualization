@@ -1,358 +1,118 @@
-Blocks :	192	Threads per Block:	32
-
-CUDA RGB <-> YCrCb Conversion: 183.29 ms
-CPU  RGB <-> YCrCb Conversion: 2855.1 ms
-CUDA RGB <-> YCrCb Conversion: 1.0285e-06 ms/pixel
-CPU  RGB <-> YCrCb Conversion: 1.6022e-05 ms/pixel
-Speedup(Cuda-Device with respect to CPU): 1557.7%
-
-Theoretical Memory Throughput[GB/s]:		14.4
-Effective Memory Throughput[GB/s]:		1.9445
-
-Grey Value:
-
-CUDA Histogram Equalisierung: 58.255 ms
-CPU  Histogram Equalisierung: 1057.7 ms
-CUDA Histogram Equalisierung: 3.6857e-07 ms/pixel
-CPU  Histogram Equalisierung: 6.6919e-06 ms/pixel
-Speedup(Cuda-Device with respect to CPU): 1815.6%
-
-RGB:
-
-CUDA Histogram Equalisierung: 297.52 ms
-CPU  Histogram Equalisierung: 6574.3 ms
-CUDA Histogram Equalisierung: 1.6695e-06 ms/pixel
-CPU  Histogram Equalisierung: 3.6892e-05 ms/pixel
-Speedup(Cuda-Device with respect to CPU): 2209.7%
-
-
-Blocks :	96	Threads per Block:	64
-
-CUDA RGB <-> YCrCb Conversion: 174.37 ms
-CPU  RGB <-> YCrCb Conversion: 2745.8 ms
-CUDA RGB <-> YCrCb Conversion: 9.7851e-07 ms/pixel
-CPU  RGB <-> YCrCb Conversion: 1.5408e-05 ms/pixel
-Speedup(Cuda-Device with respect to CPU): 1574.7%
-
-Theoretical Memory Throughput[GB/s]:		14.4
-Effective Memory Throughput[GB/s]:		2.0439
-
-Grey Value:
-
-CUDA Histogram Equalisierung: 40.494 ms
-CPU  Histogram Equalisierung: 997.26 ms
-CUDA Histogram Equalisierung: 2.562e-07 ms/pixel
-CPU  Histogram Equalisierung: 6.3095e-06 ms/pixel
-Speedup(Cuda-Device with respect to CPU): 2462.7%
-
-RGB:
-
-CUDA Histogram Equalisierung: 305.29 ms
-CPU  Histogram Equalisierung: 6666.2 ms
-CUDA Histogram Equalisierung: 1.7132e-06 ms/pixel
-CPU  Histogram Equalisierung: 3.7408e-05 ms/pixel
-Speedup(Cuda-Device with respect to CPU): 2183.5%
-
-
-Blocks :	48	Threads per Block:	128
-
-CUDA RGB <-> YCrCb Conversion: 191.17 ms
-CPU  RGB <-> YCrCb Conversion: 2800.7 ms
-CUDA RGB <-> YCrCb Conversion: 1.0728e-06 ms/pixel
-CPU  RGB <-> YCrCb Conversion: 1.5717e-05 ms/pixel
-Speedup(Cuda-Device with respect to CPU): 1465.1%
-
-Theoretical Memory Throughput[GB/s]:		14.4
-Effective Memory Throughput[GB/s]:		1.8643
-
-Grey Value:
-
-CUDA Histogram Equalisierung: 46.91 ms
-CPU  Histogram Equalisierung: 1020 ms
-CUDA Histogram Equalisierung: 2.9679e-07 ms/pixel
-CPU  Histogram Equalisierung: 6.4531e-06 ms/pixel
-Speedup(Cuda-Device with respect to CPU): 2174.3%
-
-RGB:
-
-CUDA Histogram Equalisierung: 305.56 ms
-CPU  Histogram Equalisierung: 6701.9 ms
-CUDA Histogram Equalisierung: 1.7147e-06 ms/pixel
-CPU  Histogram Equalisierung: 3.7609e-05 ms/pixel
-Speedup(Cuda-Device with respect to CPU): 2193.3%
-
-
-Blocks :	24	Threads per Block:	256
-
-CUDA RGB <-> YCrCb Conversion: 177.49 ms
-CPU  RGB <-> YCrCb Conversion: 2822.9 ms
-CUDA RGB <-> YCrCb Conversion: 9.96e-07 ms/pixel
-CPU  RGB <-> YCrCb Conversion: 1.5841e-05 ms/pixel
-Speedup(Cuda-Device with respect to CPU): 1590.5%
-
-Theoretical Memory Throughput[GB/s]:		14.4
-Effective Memory Throughput[GB/s]:		2.008
-
-Grey Value:
-
-CUDA Histogram Equalisierung: 40.861 ms
-CPU  Histogram Equalisierung: 1000.9 ms
-CUDA Histogram Equalisierung: 2.5852e-07 ms/pixel
-CPU  Histogram Equalisierung: 6.3327e-06 ms/pixel
-Speedup(Cuda-Device with respect to CPU): 2449.6%
-
-RGB:
-
-CUDA Histogram Equalisierung: 308.91 ms
-CPU  Histogram Equalisierung: 6656.8 ms
-CUDA Histogram Equalisierung: 1.7335e-06 ms/pixel
-CPU  Histogram Equalisierung: 3.7355e-05 ms/pixel
-Speedup(Cuda-Device with respect to CPU): 2154.9%
-
-
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-Blocks :	192	Threads per Block:	32
-
-CUDA RGB <-> YCrCb Conversion: 177.84 ms
-CPU  RGB <-> YCrCb Conversion: 2765.6 ms
-CUDA RGB <-> YCrCb Conversion: 9.9796e-07 ms/pixel
-CPU  RGB <-> YCrCb Conversion: 1.5519e-05 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 1555.1%
-
-Theoretical Memory Throughput[GB/s]:		14.4
-Effective Memory Throughput[GB/s]:		2.0041
-Grey Value:
-
-CUDA Histogram Equalisierung: 56.601 ms
-CPU  Histogram Equalisierung: 1017 ms
-CUDA Histogram Equalisierung: 3.581e-07 ms/pixel
-CPU  Histogram Equalisierung: 6.4347e-06 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 1796.9%
-
-RGB:
-
-CUDA Histogram Equalisierung: 297.74 ms
-CPU  Histogram Equalisierung: 6595.9 ms
-CUDA Histogram Equalisierung: 1.6708e-06 ms/pixel
-CPU  Histogram Equalisierung: 3.7014e-05 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 2215.3%
-
-
-Blocks :	96	Threads per Block:	64
-
-CUDA RGB <-> YCrCb Conversion: 176.55 ms
-CPU  RGB <-> YCrCb Conversion: 2765 ms
-CUDA RGB <-> YCrCb Conversion: 9.9073e-07 ms/pixel
-CPU  RGB <-> YCrCb Conversion: 1.5516e-05 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 1566.1%
-
-Theoretical Memory Throughput[GB/s]:		14.4
-Effective Memory Throughput[GB/s]:		2.0187
-Grey Value:
-
-CUDA Histogram Equalisierung: 42.437 ms
-CPU  Histogram Equalisierung: 1000.4 ms
-CUDA Histogram Equalisierung: 2.685e-07 ms/pixel
-CPU  Histogram Equalisierung: 6.3292e-06 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 2357.3%
-
-RGB:
-
-CUDA Histogram Equalisierung: 295.48 ms
-CPU  Histogram Equalisierung: 6612.8 ms
-CUDA Histogram Equalisierung: 1.6581e-06 ms/pixel
-CPU  Histogram Equalisierung: 3.7108e-05 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 2238%
-
-
-Blocks :	48	Threads per Block:	128
-
-CUDA RGB <-> YCrCb Conversion: 178.64 ms
-CPU  RGB <-> YCrCb Conversion: 2768.5 ms
-CUDA RGB <-> YCrCb Conversion: 1.0025e-06 ms/pixel
-CPU  RGB <-> YCrCb Conversion: 1.5536e-05 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 1549.7%
-
-Theoretical Memory Throughput[GB/s]:		14.4
-Effective Memory Throughput[GB/s]:		1.9951
-Grey Value:
-
-CUDA Histogram Equalisierung: 40.676 ms
-CPU  Histogram Equalisierung: 1002.9 ms
-CUDA Histogram Equalisierung: 2.5735e-07 ms/pixel
-CPU  Histogram Equalisierung: 6.3455e-06 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 2465.7%
-
-RGB:
-
-CUDA Histogram Equalisierung: 306.28 ms
-CPU  Histogram Equalisierung: 6705 ms
-CUDA Histogram Equalisierung: 1.7187e-06 ms/pixel
-CPU  Histogram Equalisierung: 3.7626e-05 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 2189.1%
-
-
-Blocks :	24	Threads per Block:	256
-
-CUDA RGB <-> YCrCb Conversion: 178.4 ms
-CPU  RGB <-> YCrCb Conversion: 2876.8 ms
-CUDA RGB <-> YCrCb Conversion: 1.0011e-06 ms/pixel
-CPU  RGB <-> YCrCb Conversion: 1.6144e-05 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 1612.6%
-
-Theoretical Memory Throughput[GB/s]:		14.4
-Effective Memory Throughput[GB/s]:		1.9978
-Grey Value:
-
-CUDA Histogram Equalisierung: 40.686 ms
-CPU  Histogram Equalisierung: 1034.3 ms
-CUDA Histogram Equalisierung: 2.5741e-07 ms/pixel
-CPU  Histogram Equalisierung: 6.5439e-06 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 2542.2%
-
-RGB:
-
-CUDA Histogram Equalisierung: 304.62 ms
-CPU  Histogram Equalisierung: 6704.6 ms
-CUDA Histogram Equalisierung: 1.7094e-06 ms/pixel
-CPU  Histogram Equalisierung: 3.7623e-05 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 2201%
-
-
-++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-Blocks :	192	Threads per Block:	32
-
-CUDA RGB <-> YCrCb Conversion: 193.48 ms
-CPU  RGB <-> YCrCb Conversion: 2833.6 ms
-CUDA RGB <-> YCrCb Conversion: 1.0857e-06 ms/pixel
-CPU  RGB <-> YCrCb Conversion: 1.5901e-05 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 1464.6%
-
-Theoretical Memory Throughput[GB/s]:		14.4
-Effective Memory Throughput[GB/s]:		1.8421
-Grey Value:
-
-CUDA Histogram Equalisierung: 57.011 ms
-CPU  Histogram Equalisierung: 1032.8 ms
-CUDA Histogram Equalisierung: 3.607e-07 ms/pixel
-CPU  Histogram Equalisierung: 6.5345e-06 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 1811.6%
-
-RGB:
-
-CUDA Histogram Equalisierung: 324.95 ms
-CPU  Histogram Equalisierung: 6727.3 ms
-CUDA Histogram Equalisierung: 1.8235e-06 ms/pixel
-CPU  Histogram Equalisierung: 3.7751e-05 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 2070.3%
-
-
-Blocks :	96	Threads per Block:	64
-
-CUDA RGB <-> YCrCb Conversion: 187.16 ms
-CPU  RGB <-> YCrCb Conversion: 2890.4 ms
-CUDA RGB <-> YCrCb Conversion: 1.0502e-06 ms/pixel
-CPU  RGB <-> YCrCb Conversion: 1.622e-05 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 1544.4%
-
-Theoretical Memory Throughput[GB/s]:		14.4
-Effective Memory Throughput[GB/s]:		1.9043
-Grey Value:
-
-CUDA Histogram Equalisierung: 40.822 ms
-CPU  Histogram Equalisierung: 1039.7 ms
-CUDA Histogram Equalisierung: 2.5827e-07 ms/pixel
-CPU  Histogram Equalisierung: 6.5782e-06 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 2547%
-
-RGB:
-
-CUDA Histogram Equalisierung: 304.02 ms
-CPU  Histogram Equalisierung: 6758.4 ms
-CUDA Histogram Equalisierung: 1.706e-06 ms/pixel
-CPU  Histogram Equalisierung: 3.7926e-05 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 2223%
-
-
-Blocks :	48	Threads per Block:	128
-
-CUDA RGB <-> YCrCb Conversion: 175.41 ms
-CPU  RGB <-> YCrCb Conversion: 2763.7 ms
-CUDA RGB <-> YCrCb Conversion: 9.8433e-07 ms/pixel
-CPU  RGB <-> YCrCb Conversion: 1.5508e-05 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 1575.5%
-
-Theoretical Memory Throughput[GB/s]:		14.4
-Effective Memory Throughput[GB/s]:		2.0318
-Grey Value:
-
-CUDA Histogram Equalisierung: 40.367 ms
-CPU  Histogram Equalisierung: 1024.9 ms
-CUDA Histogram Equalisierung: 2.554e-07 ms/pixel
-CPU  Histogram Equalisierung: 6.4847e-06 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 2539.1%
-
-RGB:
-
-CUDA Histogram Equalisierung: 312.92 ms
-CPU  Histogram Equalisierung: 6683.5 ms
-CUDA Histogram Equalisierung: 1.756e-06 ms/pixel
-CPU  Histogram Equalisierung: 3.7505e-05 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 2135.9%
-
-
-Blocks :	24	Threads per Block:	256
-
-CUDA RGB <-> YCrCb Conversion: 188.05 ms
-CPU  RGB <-> YCrCb Conversion: 2831.8 ms
-CUDA RGB <-> YCrCb Conversion: 1.0552e-06 ms/pixel
-CPU  RGB <-> YCrCb Conversion: 1.5891e-05 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 1505.9%
-
-Theoretical Memory Throughput[GB/s]:		14.4
-Effective Memory Throughput[GB/s]:		1.8953
-Grey Value:
-
-CUDA Histogram Equalisierung: 42.143 ms
-CPU  Histogram Equalisierung: 1013.9 ms
-CUDA Histogram Equalisierung: 2.6664e-07 ms/pixel
-CPU  Histogram Equalisierung: 6.4147e-06 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 2405.8%
-
-RGB:
-
-CUDA Histogram Equalisierung: 312.52 ms
-CPU  Histogram Equalisierung: 6704.1 ms
-CUDA Histogram Equalisierung: 1.7537e-06 ms/pixel
-CPU  Histogram Equalisierung: 3.762e-05 ms/pixel
-
-Speedup(Cuda-Device with respect to CPU): 2145.2%
+Device: GeForce 840M
+Compute Capability:		5
+Clock Rate:			1124 Hz
+Number of SMs to be used:	3
+Max Threads per SM:		2048
+Shared Memory per Block:	48 kB
+Shared Memory per SM:		64 kB
+Total Global Memory:		3 GB
+
+Color Conversion using Unified memory
+Blocks 	Threads	GPU[ms]	CPU[ms]	SpeedUp(Cuda-Device with respect to CPU)
+192	32	306.53	2792.5	9.1101
+96	64	320.57	3294.2	10.276
+48	128	353.41	2962.4	8.3823
+24	256	302.29	3024.3	10.004
+
+
+Color Conversion using pageable memory
+Blocks 	Threads	GPU[ms]	CPU[ms]	SpeedUp(Cuda-Device with respect to CPU)
+192	32	195.1	2799.7	14.35
+96	64	187.47	2743.9	14.637
+48	128	188.9	2717.7	14.387
+24	256	184.49	2736.1	14.831
+
+Color Conversion using pinned memory
+Blocks 	Threads	GPU[ms]	CPU[ms]	SpeedUp(Cuda-Device with respect to CPU)
+192	32	196.02	2862.2	14.602
+96	64	203.66	2808.5	13.79
+48	128	189.51	2843.6	15.005
+24	256	191.9	2698.7	14.063
+
+Histograms on grey value images
+Blocks 	Threads	GPU[ms]	CPU[ms]	SpeedUp(Cuda-Device with respect to CPU)
+192	32	71.865	1027	14.29
+96	64	58.393	990.1	16.956
+48	128	57.97	1043.4	17.998
+24	256	56.45	1037	18.371
+
+Histograms on RGB-images
+Blocks 	Threads	GPU[ms]	CPU[ms]	SpeedUp(Cuda-Device with respect to CPU)
+192	32	342.58	7147.2	20.863
+96	64	334.44	7041.9	21.056
+48	128	321.13	7008	21.823
+24	256	325	6954.5	21.398
+
+Color Conversion using Unified memory
+Blocks 	Threads	GPU[ms]	CPU[ms]	SpeedUp(Cuda-Device with respect to CPU)
+192	32	312.29	2877.2	9.2133
+96	64	317.33	2843.9	8.962
+48	128	326.93	2864	8.7603
+24	256	316.45	2926.1	9.2466
+
+
+Color Conversion using pageable memory
+Blocks 	Threads	GPU[ms]	CPU[ms]	SpeedUp(Cuda-Device with respect to CPU)
+192	32	175.88	2696.7	15.333
+96	64	181.67	2690.5	14.81
+48	128	181.43	2712.8	14.953
+24	256	176.57	2677.2	15.162
+
+Color Conversion using pinned memory
+Blocks 	Threads	GPU[ms]	CPU[ms]	SpeedUp(Cuda-Device with respect to CPU)
+192	32	194.16	2668.7	13.745
+96	64	193.29	2667.9	13.802
+48	128	191.17	2789	14.589
+24	256	187.28	2719.7	14.522
+
+Histograms on grey value images
+Blocks 	Threads	GPU[ms]	CPU[ms]	SpeedUp(Cuda-Device with respect to CPU)
+192	32	70.463	1001	14.205
+96	64	50.868	1011.7	19.89
+48	128	59.883	1020.6	17.043
+24	256	55.642	1000.9	17.988
+
+Histograms on RGB-images
+Blocks 	Threads	GPU[ms]	CPU[ms]	SpeedUp(Cuda-Device with respect to CPU)
+192	32	328.88	6720.1	20.433
+96	64	321.21	6652.9	20.712
+48	128	314.1	6595.4	20.998
+24	256	349.61	6844	19.576
+
+Color Conversion using Unified memory
+Blocks 	Threads	GPU[ms]	CPU[ms]	SpeedUp(Cuda-Device with respect to CPU)
+192	32	308.82	2763.4	8.9482
+96	64	305.64	3093.3	10.121
+48	128	315.24	2914.2	9.2445
+24	256	312.89	2845.5	9.0941
+
+
+Color Conversion using pageable memory
+Blocks 	Threads	GPU[ms]	CPU[ms]	SpeedUp(Cuda-Device with respect to CPU)
+192	32	183.47	2777.6	15.139
+96	64	182.92	2695.8	14.738
+48	128	187.52	2733.6	14.577
+24	256	180.57	2733.4	15.137
+
+Color Conversion using pinned memory
+Blocks 	Threads	GPU[ms]	CPU[ms]	SpeedUp(Cuda-Device with respect to CPU)
+192	32	193.53	2783.4	14.382
+96	64	184.84	2710.5	14.664
+48	128	178.04	2653	14.901
+24	256	197.6	2823.2	14.287
+
+Histograms on grey value images
+Blocks 	Threads	GPU[ms]	CPU[ms]	SpeedUp(Cuda-Device with respect to CPU)
+192	32	68.543	1001.3	14.608
+96	64	54.221	997.9	18.404
+48	128	54.573	1031.4	18.899
+24	256	53.689	1003.5	18.69
+
+Histograms on RGB-images
+Blocks 	Threads	GPU[ms]	CPU[ms]	SpeedUp(Cuda-Device with respect to CPU)
+192	32	330.43	6681	20.219
+96	64	325.88	6701.5	20.564
+48	128	320.59	6749.4	21.053
+24	256	343.19	6789.5	19.784
 
 
