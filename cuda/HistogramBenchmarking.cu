@@ -16,7 +16,6 @@
 
 using namespace std;
 
-// Times the CUDA-Implementation vs the CPU-Implementation
 void ColorConversionPageableBenchmarking(dim3 blocks, dim3 threadsPerBlock)
 {
     clock_t start_t, stop_t;
@@ -280,7 +279,6 @@ int main(int argc, char* argv[])
         ColorConversionPinnedBenchmarking(blocks, threadsPerBlock);
     }
 
-    /*
     cout<<"\nHistograms on grey value images\n";
     
     cout<<"Blocks \tThreads\t";
@@ -304,6 +302,6 @@ int main(int argc, char* argv[])
         cout<< blocks<<'\t' << threadsPerBlock;    
         RGB_HistogramOperationsBenchmarking(blocks, threadsPerBlock);
     }
-    */
+    
     return EXIT_SUCCESS;
 }
