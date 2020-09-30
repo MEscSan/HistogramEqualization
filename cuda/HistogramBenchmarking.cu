@@ -21,8 +21,6 @@ void ColorConversionPageableBenchmarking(dim3 blocks, dim3 threadsPerBlock)
 {
     clock_t start_t, stop_t;
     
-    //Number of bytes processed (1 Byte pro pixel pro Image-Channel)
-    long N = 0;
     
     double cpu_RGB2YCbCrTime = 0;
     double cuda_RGB2YCbCrTime  = 0; 
@@ -40,9 +38,47 @@ void ColorConversionPageableBenchmarking(dim3 blocks, dim3 threadsPerBlock)
         miliseconds_CUDA += test.dev_rgb2yuv(blocks,threadsPerBlock);
         miliseconds_CUDA += test.dev_yuv2rgb(blocks,threadsPerBlock);
         cuda_RGB2YCbCrTime += miliseconds_CUDA;
-        //cout << test.getRows() << '\t' << test.getCols() << '\t' << miliseconds << '\t';
 
-        N += 3*test.getRows()*test.getCols();
+        // CPU
+        start_t = clock();
+        test.host_rgb2yuv();
+        test.host_yuv2rgb();
+        stop_t = clock();
+        miliseconds_CPU +=1000.0*((double)stop_t - (double)start_t)/CLOCKS_PER_SEC;
+        cpu_RGB2YCbCrTime+= miliseconds_CPU;
+
+    }
+
+    double speedUp = cpu_RGB2YCbCrTime/cuda_RGB2YCbCrTime ;
+    
+    cout <<'\t';
+    cout <<cuda_RGB2YCbCrTime;
+    cout <<"\t"<< cpu_RGB2YCbCrTime ;
+    cout << '\t'<< speedUp;
+    cout << '\n';
+}
+
+void ColorConversionPinnedBenchmarking(dim3 blocks, dim3 threadsPerBlock)
+{
+    clock_t start_t, stop_t;
+    
+    double cpu_RGB2YCbCrTime = 0;
+    double cuda_RGB2YCbCrTime  = 0; 
+ 
+    //cout << "Rows\tCols\tTime Cuda[ms]\tTime CPU[ms]\n";
+    for (int i = 0; i < 21; i++)
+    {   
+        cout.precision(5);
+        string path = "../../Benchmark/"+ std::to_string(i) +".ppm";
+        Image test(path.data());
+        double miliseconds_CUDA = 0;
+        double miliseconds_CPU = 0;
+
+        // CUDA-Device
+        miliseconds_CUDA += test.dev_rgb2yuv_pinned(blocks,threadsPerBlock);
+        miliseconds_CUDA += test.dev_yuv2rgb_pinned(blocks,threadsPerBlock);
+        cuda_RGB2YCbCrTime += miliseconds_CUDA;
+        //cout << test.getRows() << '\t' << test.getCols() << '\t' << miliseconds << '\t';
 
         // CPU
         start_t = clock();
@@ -65,12 +101,9 @@ void ColorConversionPageableBenchmarking(dim3 blocks, dim3 threadsPerBlock)
     cout << '\n';
 }
 
-void ColorConversionPinnedBenchmarking(dim3 blocks, dim3 threadsPerBlock)
+void ColorConversionUnifiedBenchmarking(dim3 blocks, dim3 threadsPerBlock)
 {
     clock_t start_t, stop_t;
-    
-    //Number of bytes processed (1 Byte pro pixel pro Image-Channel)
-    long N = 0;
     
     double cpu_RGB2YCbCrTime = 0;
     double cuda_RGB2YCbCrTime  = 0; 
@@ -85,12 +118,10 @@ void ColorConversionPinnedBenchmarking(dim3 blocks, dim3 threadsPerBlock)
         double miliseconds_CPU = 0;
 
         // CUDA-Device
-        miliseconds_CUDA += test.dev_rgb2yuv_pinned(blocks,threadsPerBlock);
-        miliseconds_CUDA += test.dev_yuv2rgb_pinned(blocks,threadsPerBlock);
+        miliseconds_CUDA += test.dev_rgb2yuv_unified(blocks,threadsPerBlock);
+        miliseconds_CUDA += test.dev_yuv2rgb_unified(blocks,threadsPerBlock);
         cuda_RGB2YCbCrTime += miliseconds_CUDA;
         //cout << test.getRows() << '\t' << test.getCols() << '\t' << miliseconds << '\t';
-
-        N += 3*test.getRows()*test.getCols();
 
         // CPU
         start_t = clock();
@@ -197,17 +228,25 @@ int main(int argc, char* argv[])
 {
 
     cudaDeviceProp deviceProperties;
-    int numSM;
-    int maxThreadsPerSM;   
-    cudaDeviceGetAttribute(&numSM, cudaDevAttrMultiProcessorCount, 0);
-    if(argc != 0 && (int)*argv[0] - 48<numSM)
+    gpuErrchk(cudaGetDeviceProperties(&deviceProperties, 0));
+
+    int numSM = deviceProperties.multiProcessorCount;
+    int maxThreadsPerSM = deviceProperties.maxThreadsPerMultiProcessor;   
+
+    if(argc > 1 && (*argv[1] - 48)<numSM)
     {
-     	 numSM = 1;
+     	numSM = (int)(*argv[1] - 48);
     }
 
-    cudaDeviceGetAttribute(&maxThreadsPerSM, cudaDevAttrMaxThreadsPerMultiProcessor, 0);
-
-    cout<<"\nColor Conversion using pageable memory\n";
+    cout<< "\nDevice: " << deviceProperties.name;
+    cout<< "\nCompute Capability:\t\t" << deviceProperties.major, deviceProperties.minor;
+    cout<< "\nClock Rate:\t\t\t" << deviceProperties.clockRate/1000 << " Hz";
+    cout<< "\nNumber of SMs to be used:\t" << numSM;
+    cout<< "\nMax Threads per SM:\t\t" << maxThreadsPerSM;
+    cout<< "\nShared Memory per Block:\t" << deviceProperties.sharedMemPerBlock/1024 << " kB";
+    cout<< "\nShared Memory per SM:\t\t" << deviceProperties.sharedMemPerMultiprocessor/1024 << " kB";
+    cout<< "\nTotal Global Memory:\t\t" << deviceProperties.totalGlobalMem/1024/1024/1024 << " GB";
+    cout<<"\n\nColor Conversion using pageable memory\n";
     
     cout<<"Blocks \tThreads\t";
     cout<<"GPU[ms]\tCPU[ms]\tSpeedUp(Cuda-Device with respect to CPU)\n";     

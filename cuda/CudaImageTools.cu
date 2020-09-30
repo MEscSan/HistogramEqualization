@@ -410,6 +410,38 @@ float Image::dev_rgb2yuv_pinned(dim3 blocks, dim3 threadsPerBlock)
         return miliseconds;
 }
 
+float Image::dev_rgb2yuv_unified(dim3 blocks, dim3 threadsPerBlock)
+{
+        float miliseconds = 0;
+        if(_colorSpace == colorSpace::rgb)
+        {
+                
+                cudaEvent_t start, stop;
+                cudaEventCreate(&start);
+                cudaEventCreate(&stop);
+                
+                gpuErrchk( cudaMallocManaged((void**)&_host_pixels, _rows*_cols*3*sizeof(unsigned char)));
+
+                cudaEventRecord(start);
+                rgb2yuv<<< blocks, threadsPerBlock>>>(_host_pixels, _rows, _cols);
+                cudaEventRecord(stop);                
+                cudaEventSynchronize(stop);
+                cudaEventElapsedTime(&miliseconds, start, stop);  
+                cudaDeviceSynchronize();
+
+                gpuErrchk(cudaGetLastError());         
+                
+                cudaFree(_host_pixels);
+
+                gpuErrchk(cudaEventDestroy(start));
+                gpuErrchk(cudaEventDestroy(stop));
+                
+                _colorSpace = colorSpace::yuv;
+
+        } 
+        return miliseconds;
+}
+
 float Image::dev_rgb2hsv(dim3 blocks, dim3 threadsPerBlock)
 {
         float miliseconds = 0;
@@ -520,7 +552,39 @@ float Image::dev_yuv2rgb_pinned(dim3 blocks, dim3 threadsPerBlock)
 
                 cudaFree(_dev_pixels);
                 cudaFreeHost(host_pixels_pinned);
-                
+
+                gpuErrchk(cudaEventDestroy(start));
+                gpuErrchk(cudaEventDestroy(stop));
+
+                _colorSpace = colorSpace::rgb;
+        }
+
+        return miliseconds;
+}
+
+float Image::dev_yuv2rgb_unified(dim3 blocks, dim3 threadsPerBlock)
+{       
+        float miliseconds = 0;
+
+        if(_colorSpace == colorSpace::yuv)
+        {
+
+                cudaEvent_t start, stop;
+                cudaEventCreate(&start);
+                cudaEventCreate(&stop);
+
+                gpuErrchk( cudaMallocManaged((void**)&_host_pixels, _rows*_cols*3*sizeof(unsigned char)));
+
+                cudaEventRecord(start);
+                yuv2rgb<<<blocks, threadsPerBlock>>>(_host_pixels, _rows, _cols);
+                cudaEventRecord(stop);      
+                cudaEventSynchronize(stop);
+                cudaEventElapsedTime(&miliseconds, start, stop); 
+
+                gpuErrchk(cudaGetLastError());
+              
+                cudaFree(_host_pixels);
+
                 gpuErrchk(cudaEventDestroy(start));
                 gpuErrchk(cudaEventDestroy(stop));
 

@@ -137,8 +137,10 @@ class Image
         float dev_color2gvp(dim3 blocks = 48, dim3 threadsPerBlock = 128 );
         float dev_rgb2yuv(dim3 blocks = 48, dim3 threadsPerBlock = 128 );
         float dev_rgb2yuv_pinned(dim3 blocks = 48, dim3 threadsPerBlock = 128 );
+        float dev_rgb2yuv_unified(dim3 blocks = 48, dim3 threadsPerBlock = 128 );
         float dev_yuv2rgb(dim3 blocks = 48, dim3 threadsPerBlock = 128 );
         float dev_yuv2rgb_pinned(dim3 blocks = 48, dim3 threadsPerBlock = 128 );
+        float dev_yuv2rgb_unified(dim3 blocks = 48, dim3 threadsPerBlock = 128 );
         float dev_rgb2hsv(dim3 blocks = 48, dim3 threadsPerBlock = 128 );
 
         // The "host_" methods run the full color-conversion operation on the CPU
@@ -298,7 +300,7 @@ inline __device__ double dev_clamp(double x, double min = 0, double max = 255)
     {
             y = min;
     }
-    else if(x>=max)
+    if(x>=max)
     {
             //In order to avoid artifacts because of double to char conversion
             y = max - 0.1;
@@ -313,7 +315,7 @@ inline __device__ int dev_clamp (int x, int min = 0, int max = 255)
     {
             y = min;
     }
-    else if(x>max)
+    if(x>max)
     {
             
             y = max;
