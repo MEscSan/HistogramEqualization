@@ -420,21 +420,26 @@ float Image::dev_rgb2yuv_unified(dim3 blocks, dim3 threadsPerBlock)
                 cudaEventCreate(&start);
                 cudaEventCreate(&stop);
                 
-                gpuErrchk( cudaMallocManaged((void**)&_host_pixels, _rows*_cols*3*sizeof(unsigned char)));
+                //unsigned char* host_pixels_unified;
+                
+                gpuErrchk( cudaMallocManaged(&_host_pixels, _rows*_cols*3*sizeof(unsigned char)));
+                //memcpy(host_pixels_unified, _host_pixels, _rows*_cols*3*sizeof(unsigned char));
 
                 cudaEventRecord(start);
                 rgb2yuv<<< blocks, threadsPerBlock>>>(_host_pixels, _rows, _cols);
-                cudaEventRecord(stop);                
-                cudaEventSynchronize(stop);
-                cudaEventElapsedTime(&miliseconds, start, stop);  
-                cudaDeviceSynchronize();
+                //gpuErrchk(cudaGetLastError()); 
+                 cudaEventRecord(stop);   
+                cudaDeviceSynchronize();   
+               
+                //memcpy(_host_pixels, host_pixels_unified, _rows*_cols*3*sizeof(unsigned char));
 
-                gpuErrchk(cudaGetLastError());         
-                
-                cudaFree(_host_pixels);
+                //cudaFree(_host_pixels);
 
                 gpuErrchk(cudaEventDestroy(start));
-                gpuErrchk(cudaEventDestroy(stop));
+                gpuErrchk(cudaEventDestroy(stop)); 
+                
+                cudaEventSynchronize(stop);
+                cudaEventElapsedTime(&miliseconds, start, stop);  
                 
                 _colorSpace = colorSpace::yuv;
 
@@ -573,20 +578,24 @@ float Image::dev_yuv2rgb_unified(dim3 blocks, dim3 threadsPerBlock)
                 cudaEventCreate(&start);
                 cudaEventCreate(&stop);
 
-                gpuErrchk( cudaMallocManaged((void**)&_host_pixels, _rows*_cols*3*sizeof(unsigned char)));
-
+                //cudaEventRecord(start);
+                gpuErrchk( cudaMallocManaged(&_host_pixels, _rows*_cols*3*sizeof(unsigned char)));
+             
                 cudaEventRecord(start);
                 yuv2rgb<<<blocks, threadsPerBlock>>>(_host_pixels, _rows, _cols);
-                cudaEventRecord(stop);      
-                cudaEventSynchronize(stop);
-                cudaEventElapsedTime(&miliseconds, start, stop); 
+                //gpuErrchk(cudaGetLastError());
+                cudaEventRecord(stop); 
+                cudaDeviceSynchronize();           
 
-                gpuErrchk(cudaGetLastError());
-              
-                cudaFree(_host_pixels);
+                //cudaFree(_host_pixels);      
+                
+                cudaEventSynchronize(stop);
+                cudaEventElapsedTime(&miliseconds, start, stop);  
 
                 gpuErrchk(cudaEventDestroy(start));
-                gpuErrchk(cudaEventDestroy(stop));
+                gpuErrchk(cudaEventDestroy(stop));               
+                
+
 
                 _colorSpace = colorSpace::rgb;
         }
