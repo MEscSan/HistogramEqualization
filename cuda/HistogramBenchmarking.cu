@@ -17,7 +17,7 @@
 using namespace std;
 
 // Times the CUDA-Implementation vs the CPU-Implementation
-void ColorConversionBenchmarking(dim3 blocks, dim3 threadsPerBlock)
+void ColorConversionPageableBenchmarking(dim3 blocks, dim3 threadsPerBlock)
 {
     clock_t start_t, stop_t;
     
@@ -33,12 +33,13 @@ void ColorConversionBenchmarking(dim3 blocks, dim3 threadsPerBlock)
         cout.precision(5);
         string path = "../../Benchmark/"+ std::to_string(i) +".ppm";
         Image test(path.data());
-        double miliseconds = 0;
+        double miliseconds_CUDA = 0;
+        double miliseconds_CPU = 0;
 
         // CUDA-Device
-        miliseconds += test.dev_rgb2yuv(blocks,threadsPerBlock);
-        miliseconds += test.dev_yuv2rgb(blocks,threadsPerBlock);
-        cuda_RGB2YCbCrTime += miliseconds;
+        miliseconds_CUDA += test.dev_rgb2yuv(blocks,threadsPerBlock);
+        miliseconds_CUDA += test.dev_yuv2rgb(blocks,threadsPerBlock);
+        cuda_RGB2YCbCrTime += miliseconds_CUDA;
         //cout << test.getRows() << '\t' << test.getCols() << '\t' << miliseconds << '\t';
 
         N += 3*test.getRows()*test.getCols();
@@ -48,46 +49,77 @@ void ColorConversionBenchmarking(dim3 blocks, dim3 threadsPerBlock)
         test.host_rgb2yuv();
         test.host_yuv2rgb();
         stop_t = clock();
-        miliseconds +=1000.0*((double)stop_t - (double)start_t)/CLOCKS_PER_SEC;
-        cpu_RGB2YCbCrTime+= miliseconds;
+        miliseconds_CPU +=1000.0*((double)stop_t - (double)start_t)/CLOCKS_PER_SEC;
+        cpu_RGB2YCbCrTime+= miliseconds_CPU;
         
         //cout << '\t' << miliseconds <<'\n';
 
     }
 
-    cout <<'\n';
-    cout <<"CUDA RGB <-> YCrCb Conversion: " << cuda_RGB2YCbCrTime  << " ms\n";
-    cout <<"CPU  RGB <-> YCrCb Conversion: " << cpu_RGB2YCbCrTime << " ms\n";
-    cout <<"CUDA RGB <-> YCrCb Conversion: " << cuda_RGB2YCbCrTime /N << " ms/pixel\n";
-    cout <<"CPU  RGB <-> YCrCb Conversion: " << cpu_RGB2YCbCrTime/N << " ms/pixel\n";
+    double speedUp = cpu_RGB2YCbCrTime/cuda_RGB2YCbCrTime ;
     
-    double speedUp = 100*cpu_RGB2YCbCrTime/cuda_RGB2YCbCrTime ;
-    cout << "Speedup(Cuda-Device with respect to CPU): " << speedUp << "%\n\n";
+    cout <<'\t';
+    cout <<cuda_RGB2YCbCrTime;
+    cout <<"\t"<< cpu_RGB2YCbCrTime ;
+    cout << '\t'<< speedUp;
+    cout << '\n';
+}
 
-    // Theoretical Memory Throughput[Gb/s]: 2*CUDA-Device clock-Rate[Hz] * busWidth[bytes]/1.0e9
-    int clockRate_kHz;
-	int busWidth_bits;
-	cudaDeviceGetAttribute(&clockRate_kHz, cudaDevAttrMemoryClockRate, 0);
-	cudaDeviceGetAttribute(&busWidth_bits, cudaDevAttrGlobalMemoryBusWidth, 0);
-	double theorMemThroughput= 2.0*clockRate_kHz*(busWidth_bits/8.0)/1.0e6;
+void ColorConversionPinnedBenchmarking(dim3 blocks, dim3 threadsPerBlock)
+{
+    clock_t start_t, stop_t;
+    
+    //Number of bytes processed (1 Byte pro pixel pro Image-Channel)
+    long N = 0;
+    
+    double cpu_RGB2YCbCrTime = 0;
+    double cuda_RGB2YCbCrTime  = 0; 
+ 
+    //cout << "Rows\tCols\tTime Cuda[ms]\tTime CPU[ms]\n";
+    for (int i = 0; i < 21; i++)
+    {   
+        cout.precision(5);
+        string path = "../../Benchmark/"+ std::to_string(i) +".ppm";
+        Image test(path.data());
+        double miliseconds_CUDA = 0;
+        double miliseconds_CPU = 0;
 
-    //Effective Memory Throughput[Gb/s]: Total number of Gbytes * 2(read/write) / time[ms]
-    double effMemThroughput = (N*2/cuda_RGB2YCbCrTime )/1.0e6;
+        // CUDA-Device
+        miliseconds_CUDA += test.dev_rgb2yuv_pinned(blocks,threadsPerBlock);
+        miliseconds_CUDA += test.dev_yuv2rgb_pinned(blocks,threadsPerBlock);
+        cuda_RGB2YCbCrTime += miliseconds_CUDA;
+        //cout << test.getRows() << '\t' << test.getCols() << '\t' << miliseconds << '\t';
 
-    cout <<"Theoretical Memory Throughput[GB/s]:\t\t" << theorMemThroughput << '\n';
-    cout <<"Effective Memory Throughput[GB/s]:\t\t" << effMemThroughput << '\n';
+        N += 3*test.getRows()*test.getCols();
+
+        // CPU
+        start_t = clock();
+        test.host_rgb2yuv();
+        test.host_yuv2rgb();
+        stop_t = clock();
+        miliseconds_CPU +=1000.0*((double)stop_t - (double)start_t)/CLOCKS_PER_SEC;
+        cpu_RGB2YCbCrTime+= miliseconds_CPU;
+        
+        //cout << '\t' << miliseconds <<'\n';
+
+    }
+
+    double speedUp = cpu_RGB2YCbCrTime/cuda_RGB2YCbCrTime ;
+    
+    cout <<'\t';
+    cout <<cuda_RGB2YCbCrTime;
+    cout <<"\t"<< cpu_RGB2YCbCrTime ;
+    cout << '\t'<< speedUp;
+    cout << '\n';
 }
 
 void RGB_HistogramOperationsBenchmarking(dim3 blocks, dim3 threadsPerBlock)
 {
     clock_t start_t, stop_t;
     
-    long N = 0; 
-    
     double cpu_histogramTime = 0;
     double cuda_histogramTime = 0; 
- 
-    cout << "RGB:\n";
+
 
     for (int i = 0; i < 21; i++)
     {   
@@ -95,45 +127,39 @@ void RGB_HistogramOperationsBenchmarking(dim3 blocks, dim3 threadsPerBlock)
         string path = "../../Benchmark/"+ std::to_string(i) +".ppm";
         Image test(path.data());
         Histogram hist(test);
-        double miliseconds = 0;
+        double miliseconds_CUDA = 0;
+	    double miliseconds_CPU = 0;
 
         // CUDA-Device
-        miliseconds += hist.dev_normalize(blocks,threadsPerBlock);
-        miliseconds += hist.dev_equalize(blocks,threadsPerBlock);
-        cuda_histogramTime+= miliseconds;
-
-        N += 3*test.getRows()*test.getCols();
+        miliseconds_CUDA += hist.dev_normalize(blocks,threadsPerBlock);
+        miliseconds_CUDA += hist.dev_equalize(blocks,threadsPerBlock);
+        cuda_histogramTime+= miliseconds_CUDA;
 
         // CPU
         start_t = clock();
         hist.host_normalize();
         hist.host_equalize();
         stop_t = clock();
-        miliseconds +=1000.0*((double)stop_t - (double)start_t)/CLOCKS_PER_SEC;
-        cpu_histogramTime+= miliseconds;
+        miliseconds_CPU +=1000.0*((double)stop_t - (double)start_t)/CLOCKS_PER_SEC;
+        cpu_histogramTime+= miliseconds_CPU;
 
     }
 
-    cout <<'\n';
-    cout <<"CUDA Histogram Equalisierung: " << cuda_histogramTime << " ms\n";
-    cout <<"CPU  Histogram Equalisierung: " << cpu_histogramTime << " ms\n";
-    cout <<"CUDA Histogram Equalisierung: " << cuda_histogramTime/N << " ms/pixel\n";
-    cout <<"CPU  Histogram Equalisierung: " << cpu_histogramTime/N << " ms/pixel\n";
+    double speedUp = cpu_histogramTime/cuda_histogramTime;
+    cout <<'\t';
+    cout <<cuda_histogramTime;
+    cout <<"\t"<< cpu_histogramTime ;
+    cout << '\t'<< speedUp;
+    cout << '\n';
     
-    double speedUp = 100*cpu_histogramTime/cuda_histogramTime;
-    cout << "Speedup(Cuda-Device with respect to CPU): " << speedUp << "%\n\n";
 }
 
 void GVP_HistogramOperationsBenchmarking(dim3 blocks, dim3 threadsPerBlock)
 {
     clock_t start_t, stop_t;
     
-    long N = 0; 
-    
     double cpu_histogramTime = 0;
     double cuda_histogramTime = 0; 
- 
-    cout << "\nGrey Value:\n";
 
     for (int i = 0; i < 21; i++)
     {   
@@ -141,51 +167,92 @@ void GVP_HistogramOperationsBenchmarking(dim3 blocks, dim3 threadsPerBlock)
         string path = "../../Benchmark/"+ std::to_string(i) +".pgm";
         Image test(path.data());
         Histogram hist(test);
-        double miliseconds = 0;
+        double miliseconds_CUDA = 0;
+        double miliseconds_CPU = 0;
 
         // CUDA-Device
-        miliseconds += hist.dev_normalize(blocks,threadsPerBlock);
-        miliseconds += hist.dev_equalize(blocks,threadsPerBlock);
-        cuda_histogramTime+= miliseconds;
-
-        N += 3*test.getRows()*test.getCols();
+        miliseconds_CUDA += hist.dev_normalize(blocks,threadsPerBlock);
+        miliseconds_CUDA += hist.dev_equalize(blocks,threadsPerBlock);
+        cuda_histogramTime+= miliseconds_CUDA;
 
         // CPU
         start_t = clock();
         hist.host_normalize();
         hist.host_equalize();
         stop_t = clock();
-        miliseconds +=1000.0*((double)stop_t - (double)start_t)/CLOCKS_PER_SEC;
-        cpu_histogramTime+= miliseconds;
+        miliseconds_CPU +=1000.0*((double)stop_t - (double)start_t)/CLOCKS_PER_SEC;
+        cpu_histogramTime+= miliseconds_CPU;
 
     }
 
-    cout <<'\n';
-    cout <<"CUDA Histogram Equalisierung: " << cuda_histogramTime << " ms\n";
-    cout <<"CPU  Histogram Equalisierung: " << cpu_histogramTime << " ms\n";
-    cout <<"CUDA Histogram Equalisierung: " << cuda_histogramTime/N << " ms/pixel\n";
-    cout <<"CPU  Histogram Equalisierung: " << cpu_histogramTime/N << " ms/pixel\n";
-    
-    double speedUp = 100*cpu_histogramTime/cuda_histogramTime;
-    cout << "Speedup(Cuda-Device with respect to CPU): " << speedUp << "%\n\n";
+    double speedUp = cpu_histogramTime/cuda_histogramTime;
+    cout <<'\t';
+    cout <<cuda_histogramTime;
+    cout <<"\t"<< cpu_histogramTime ;
+    cout << '\t'<< speedUp;
+    cout << '\n';
 }
 
-int main()
+int main(int argc, char* argv[])
 {
+
+    cudaDeviceProp deviceProperties;
     int numSM;
-    int maxThreadsPerSM;
+    int maxThreadsPerSM;   
     cudaDeviceGetAttribute(&numSM, cudaDevAttrMultiProcessorCount, 0);
+    if(argc != 0 && (int)*argv[0] - 48<numSM)
+    {
+     	 numSM = 1;
+    }
+
     cudaDeviceGetAttribute(&maxThreadsPerSM, cudaDevAttrMaxThreadsPerMultiProcessor, 0);
 
+    cout<<"\nColor Conversion using pageable memory\n";
+    
+    cout<<"Blocks \tThreads\t";
+    cout<<"GPU[ms]\tCPU[ms]\tSpeedUp(Cuda-Device with respect to CPU)\n";     
+    for(int threadsPerBlock = 32; threadsPerBlock<512; threadsPerBlock*=2)
+    {
+        int blocks = numSM*maxThreadsPerSM/threadsPerBlock;
+        cout<< blocks<<'\t' << threadsPerBlock;
+        ColorConversionPageableBenchmarking(blocks, threadsPerBlock);
+    }
+
+    cout<<"\nColor Conversion using pinned memory\n";
+    
+    cout<<"Blocks \tThreads\t";
+    cout<<"GPU[ms]\tCPU[ms]\tSpeedUp(Cuda-Device with respect to CPU)\n";     
+    for(int threadsPerBlock = 32; threadsPerBlock<512; threadsPerBlock*=2)
+    {
+        int blocks = numSM*maxThreadsPerSM/threadsPerBlock;
+        cout<< blocks<<'\t' << threadsPerBlock;
+        ColorConversionPinnedBenchmarking(blocks, threadsPerBlock);
+    }
+
+    /*
+    cout<<"\nHistograms on grey value images\n";
+    
+    cout<<"Blocks \tThreads\t";
+    cout<<"GPU[ms]\tCPU[ms]\tSpeedUp(Cuda-Device with respect to CPU)\n";   
     for(int threadsPerBlock = 32; threadsPerBlock<512; threadsPerBlock*=2)
     {
         int blocks = numSM*maxThreadsPerSM/threadsPerBlock;
 
-        cout<<"\nBlocks :\t" << blocks <<"\tThreads per Block:\t" << threadsPerBlock << "\n";
-        ColorConversionBenchmarking(blocks, threadsPerBlock);
+        cout<< blocks<<'\t' << threadsPerBlock;
         GVP_HistogramOperationsBenchmarking(blocks, threadsPerBlock);     
+    }
+
+    cout<<"\nHistograms on RGB-images\n";
+    
+    cout<<"Blocks \tThreads\t";
+    cout<<"GPU[ms]\tCPU[ms]\tSpeedUp(Cuda-Device with respect to CPU)\n";   
+    for(int threadsPerBlock = 32; threadsPerBlock<512; threadsPerBlock*=2)
+    {
+        int blocks = numSM*maxThreadsPerSM/threadsPerBlock;
+
+        cout<< blocks<<'\t' << threadsPerBlock;    
         RGB_HistogramOperationsBenchmarking(blocks, threadsPerBlock);
     }
- 
+    */
     return EXIT_SUCCESS;
 }

@@ -14,34 +14,3 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
       if (abort) exit(code);
    }
 }
-
-inline void checkCuda(cudaError_t result)
-{
-  if (result != cudaSuccess)
-  {
-    printf("%s: %s\n", cudaGetErrorName(result), cudaGetErrorString(result));
-    exit(EXIT_FAILURE);
-  }
-}
-
-inline void verboseCudaReset()
-{
-  cudaError_t result = cudaGetLastError();
-  printf("%s: %s\n", cudaGetErrorName(result), cudaGetErrorString(result));
-}
-
-inline void checkLastCuda()
-{
-  cudaError_t result = cudaGetLastError();
-  if (result != cudaSuccess)
-  {
-    printf("%s: %s\n", cudaGetErrorName(result), cudaGetErrorString(result));
-    exit(EXIT_FAILURE);
-  }
-}
-
-inline void verboseCuda()
-{
-  cudaError_t result = cudaPeekAtLastError();
-  printf("%s: %s\n", cudaGetErrorName(result), cudaGetErrorString(result));
-}

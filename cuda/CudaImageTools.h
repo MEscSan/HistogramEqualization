@@ -136,7 +136,9 @@ class Image
         // The standard methods allocate memory and call the corresponding kernel automatically
         float dev_color2gvp(dim3 blocks = 48, dim3 threadsPerBlock = 128 );
         float dev_rgb2yuv(dim3 blocks = 48, dim3 threadsPerBlock = 128 );
+        float dev_rgb2yuv_pinned(dim3 blocks = 48, dim3 threadsPerBlock = 128 );
         float dev_yuv2rgb(dim3 blocks = 48, dim3 threadsPerBlock = 128 );
+        float dev_yuv2rgb_pinned(dim3 blocks = 48, dim3 threadsPerBlock = 128 );
         float dev_rgb2hsv(dim3 blocks = 48, dim3 threadsPerBlock = 128 );
 
         // The "host_" methods run the full color-conversion operation on the CPU
