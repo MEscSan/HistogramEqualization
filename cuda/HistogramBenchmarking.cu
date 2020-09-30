@@ -246,6 +246,18 @@ int main(int argc, char* argv[])
     cout<< "\nShared Memory per Block:\t" << deviceProperties.sharedMemPerBlock/1024 << " kB";
     cout<< "\nShared Memory per SM:\t\t" << deviceProperties.sharedMemPerMultiprocessor/1024 << " kB";
     cout<< "\nTotal Global Memory:\t\t" << deviceProperties.totalGlobalMem/1024/1024/1024 << " GB";
+    
+    cout<<"\nColor Conversion using Unified memory\n";
+    
+    cout<<"Blocks \tThreads\t";
+    cout<<"GPU[ms]\tCPU[ms]\tSpeedUp(Cuda-Device with respect to CPU)\n";     
+    for(int threadsPerBlock = 32; threadsPerBlock<512; threadsPerBlock*=2)
+    {
+        int blocks = numSM*maxThreadsPerSM/threadsPerBlock;
+        cout<< blocks<<'\t' << threadsPerBlock;
+        ColorConversionUnifiedBenchmarking(blocks, threadsPerBlock);
+    }
+    
     cout<<"\n\nColor Conversion using pageable memory\n";
     
     cout<<"Blocks \tThreads\t";
