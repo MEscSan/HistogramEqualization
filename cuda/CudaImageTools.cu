@@ -391,8 +391,6 @@ float Image::dev_rgb2yuv_pinned(dim3 blocks, dim3 threadsPerBlock)
                 cudaEventSynchronize(stop);
                 cudaEventElapsedTime(&miliseconds, start, stop);  
 
-                gpuErrchk(cudaGetLastError());         
-                
                 gpuErrchk(cudaMemcpy(host_pixels_pinned, _dev_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyDeviceToHost));
   
                 //Copy back pinned memory to pageable memory
@@ -428,18 +426,19 @@ float Image::dev_rgb2yuv_unified(dim3 blocks, dim3 threadsPerBlock)
                 cudaEventRecord(start);
                 rgb2yuv<<< blocks, threadsPerBlock>>>(_host_pixels, _rows, _cols);
                 //gpuErrchk(cudaGetLastError()); 
-                 cudaEventRecord(stop);   
+                cudaEventRecord(stop);   
                 cudaDeviceSynchronize();   
                
                 //memcpy(_host_pixels, host_pixels_unified, _rows*_cols*3*sizeof(unsigned char));
 
-                //cudaFree(_host_pixels);
+                //cudaFree(_host_pixels);  
+                cudaEventSynchronize(stop);
+                cudaEventElapsedTime(&miliseconds, start, stop);  
 
                 gpuErrchk(cudaEventDestroy(start));
                 gpuErrchk(cudaEventDestroy(stop)); 
                 
-                cudaEventSynchronize(stop);
-                cudaEventElapsedTime(&miliseconds, start, stop);  
+
                 
                 _colorSpace = colorSpace::yuv;
 
