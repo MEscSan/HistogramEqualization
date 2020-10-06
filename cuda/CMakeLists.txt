@@ -8,8 +8,14 @@ set(CMAKE_CUDA_FLAGS " -gencode=arch=compute_50,code=sm_50, -gencode=arch=comput
 #Supress warning about deprecated architectures
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Wno-deprecated-gpu-targets")
 
+#Set C++ Standard to  C++ 17
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+
 add_executable(EqualizationTest EqualizationTest.cu CudaImageTools.cu CudaHistogramTools.cu)
 add_executable(HistogramBenchmarking HistogramBenchmarking.cu CudaImageTools.cu CudaHistogramTools.cu)
+target_link_libraries(HistogramBenchmarking stdc++fs)
 
 
 

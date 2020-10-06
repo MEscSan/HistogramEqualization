@@ -306,16 +306,19 @@ float Image::dev_rgb2yuv(dim3 blocks, dim3 threadsPerBlock)
                 
                 gpuErrchk( cudaMallocManaged((void**)&_dev_pixels, _rows*_cols*3*sizeof(unsigned char)));
 
-                gpuErrchk( cudaMemcpy(_dev_pixels, _host_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyHostToDevice));
-
+                // Begin benchmark
                 cudaEventRecord(start);
+
+                gpuErrchk( cudaMemcpy(_dev_pixels, _host_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyHostToDevice));
+                
                 rgb2yuv<<< blocks, threadsPerBlock>>>(_dev_pixels, _rows, _cols);
-                cudaEventRecord(stop);
-        
+               
                 gpuErrchk(cudaGetLastError());
        
                 gpuErrchk(cudaMemcpy(_host_pixels, _dev_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyDeviceToHost));
 
+                // Stop benchmark
+                cudaEventRecord(stop);
                 cudaEventSynchronize(stop);
                 cudaEventElapsedTime(&miliseconds, start, stop);
                 
@@ -350,13 +353,16 @@ float Image::dev_rgb2yuv_pinned(dim3 blocks, dim3 threadsPerBlock)
                 
                 gpuErrchk( cudaMalloc((void**)&_dev_pixels, _rows*_cols*3*sizeof(unsigned char)));
 
-                gpuErrchk( cudaMemcpy(_dev_pixels, host_pixels_pinned, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyHostToDevice));
-
+                // Begin benchmark
                 cudaEventRecord(start);
+
+                gpuErrchk( cudaMemcpy(_dev_pixels, host_pixels_pinned, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyHostToDevice));
                 rgb2yuv<<< blocks, threadsPerBlock>>>(_dev_pixels, _rows, _cols);
-                cudaEventRecord(stop);                
+                gpuErrchk(cudaMemcpy(host_pixels_pinned, _dev_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyDeviceToHost));       
                 
-                gpuErrchk(cudaMemcpy(host_pixels_pinned, _dev_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyDeviceToHost));           
+                //Stop benchmark
+                cudaEventRecord(stop); 
+
                 //Copy back pinned memory to pageable memory
                 memcpy(_host_pixels, host_pixels_pinned, _rows*_cols*3*sizeof(unsigned char));
 
@@ -386,16 +392,17 @@ float Image::dev_rgb2yuv_unified(dim3 blocks, dim3 threadsPerBlock)
                 cudaEventCreate(&start);
                 cudaEventCreate(&stop);
                 
-                //unsigned char* host_pixels_unified;
-                
                 gpuErrchk( cudaMallocManaged(&_host_pixels, _rows*_cols*3*sizeof(unsigned char)));
-                //memcpy(host_pixels_unified, _host_pixels, _rows*_cols*3*sizeof(unsigned char));
 
+                // Begin benchmark (with unified memory no cudamemcopy-operation needed)
                 cudaEventRecord(start);
+
                 rgb2yuv<<< blocks, threadsPerBlock>>>(_host_pixels, _rows, _cols);
-                cudaEventRecord(stop);   
                 cudaDeviceSynchronize();   
-               
+
+                //Stop benchmark 
+                cudaEventRecord(stop);   
+
                 cudaEventSynchronize(stop);
                 cudaEventElapsedTime(&miliseconds, start, stop);  
 
@@ -460,15 +467,16 @@ float Image::dev_yuv2rgb(dim3 blocks, dim3 threadsPerBlock)
 
                 gpuErrchk( cudaMalloc((void**)&_dev_pixels, _rows*_cols*3*sizeof(unsigned char)));
 
-                gpuErrchk( cudaMemcpy(_dev_pixels, _host_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyHostToDevice));
-
+                //Begin benchmark
                 cudaEventRecord(start);
+
+                gpuErrchk( cudaMemcpy(_dev_pixels, _host_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyHostToDevice));
                 yuv2rgb<<<blocks, threadsPerBlock>>>(_dev_pixels, _rows, _cols);
-                cudaEventRecord(stop);
-
                 gpuErrchk(cudaGetLastError());
-
                 gpuErrchk(cudaMemcpy(_host_pixels, _dev_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyDeviceToHost));  
+
+                //Stop benchmark
+                cudaEventRecord(stop);
                 
                 cudaEventSynchronize(stop);
                 cudaEventElapsedTime(&miliseconds, start, stop);
@@ -506,14 +514,15 @@ float Image::dev_yuv2rgb_pinned(dim3 blocks, dim3 threadsPerBlock)
 
                 gpuErrchk( cudaMalloc((void**)&_dev_pixels, _rows*_cols*3*sizeof(unsigned char)));
 
-                gpuErrchk( cudaMemcpy(_dev_pixels, host_pixels_pinned, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyHostToDevice));
-
+                // Begin benchmark
                 cudaEventRecord(start);
-                yuv2rgb<<<blocks, threadsPerBlock>>>(_dev_pixels, _rows, _cols);
-                cudaEventRecord(stop);      
 
+                gpuErrchk( cudaMemcpy(_dev_pixels, host_pixels_pinned, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyHostToDevice));
+                yuv2rgb<<<blocks, threadsPerBlock>>>(_dev_pixels, _rows, _cols);
                 gpuErrchk(cudaMemcpy(host_pixels_pinned, _dev_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyDeviceToHost));
 
+                // Stop benchmark
+                cudaEventRecord(stop);     
                 memcpy(_host_pixels, host_pixels_pinned, _rows*_cols*3*sizeof(unsigned char));   
                 
                 cudaEventSynchronize(stop);
@@ -542,16 +551,15 @@ float Image::dev_yuv2rgb_unified(dim3 blocks, dim3 threadsPerBlock)
                 cudaEventCreate(&start);
                 cudaEventCreate(&stop);
 
-                //cudaEventRecord(start);
                 gpuErrchk( cudaMallocManaged(&_host_pixels, _rows*_cols*3*sizeof(unsigned char)));
              
+                // Begin benchmark
                 cudaEventRecord(start);
                 yuv2rgb<<<blocks, threadsPerBlock>>>(_host_pixels, _rows, _cols);
+                // Stop benchmark
                 cudaEventRecord(stop); 
 
-                cudaDeviceSynchronize();           
-
-                //cudaFree(_host_pixels);      
+                cudaDeviceSynchronize();               
                 
                 cudaEventSynchronize(stop);
                 cudaEventElapsedTime(&miliseconds, start, stop);  
