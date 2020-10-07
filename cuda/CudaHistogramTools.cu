@@ -136,12 +136,12 @@ float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
     cudaFree(_dev_valuesCumulative);
     cudaFree(g_partialCumulative);
     cudaFree(sums);
-    cudaFree(g_partialHistograms);
+    cudaFree(g_partialHistograms);   
+    
+    miliseconds += ms1 + ms2;
 
     //Convert back to RGB if necessary
-    _src.dev_yuv2rgb(blocks, threadsPerBlock);
-
-    miliseconds += ms1 + ms2;
+    miliseconds += _src.dev_yuv2rgb(blocks, threadsPerBlock);
 
     return miliseconds;
 }
@@ -217,7 +217,7 @@ void Histogram::display(ostream& output)
 
 float Histogram::dev_equalize(dim3 blocks, dim3 threadsPerBlock)
 {
-    float miliseconds = 0;
+    float miliseconds = 0, ms1 = 0 ;
     cudaEvent_t start, stop; 
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
@@ -237,7 +237,6 @@ float Histogram::dev_equalize(dim3 blocks, dim3 threadsPerBlock)
     gpuErrchk(cudaMalloc((void**)& _dev_lookUpTable, _numValues*sizeof(unsigned char)));
     gpuErrchk(cudaMalloc((void**)& _dev_pixels, numPixels*sizeof(unsigned char)));
     gpuErrchk(cudaMalloc((void**)& _dev_valuesCumulative, _numValues*sizeof(double)));
-
 
     // Beginn benchmark 
     cudaEventRecord(start);
@@ -260,11 +259,12 @@ float Histogram::dev_equalize(dim3 blocks, dim3 threadsPerBlock)
     cudaEventRecord(stop);
 
     cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&miliseconds, start, stop);
+    cudaEventElapsedTime(&ms1, start, stop);
     cudaFree(_dev_lookUpTable);
     cudaFree(_dev_pixels);
     cudaFree(_dev_valuesCumulative);
 
+    miliseconds += ms1;
     miliseconds += dev_getHistogram(blocks, threadsPerBlock);
 
     //Transform the image back to RGB-Space if necessary
@@ -311,7 +311,7 @@ void Histogram::host_equalize()
 
 float Histogram::dev_normalize(dim3 blocks, dim3 threadsPerBlock)
 {
-    float miliseconds=0;
+    float miliseconds=0, ms1 = 0;
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
@@ -353,11 +353,13 @@ float Histogram::dev_normalize(dim3 blocks, dim3 threadsPerBlock)
     cudaEventRecord(stop);
 
     cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&miliseconds, start, stop);
+    cudaEventElapsedTime(&ms1, start, stop);
 
     cudaFree(_dev_lookUpTable);
     cudaFree(_dev_pixels); 
 
+    miliseconds += ms1;
+    
     miliseconds += dev_getHistogram(blocks, threadsPerBlock);
 
     miliseconds +=_src.dev_yuv2rgb(blocks, threadsPerBlock);
