@@ -254,12 +254,17 @@ float Image::dev_color2gvp(dim3 blocks, dim3 threadsPerBlock)
         // Allocate Memory in CUDA-Device
         gpuErrchk( cudaMalloc((void**)&_dev_pixels, _rows*_cols*3*sizeof(unsigned char)));
 
+        //Begin benchmark
+        cudaEventRecord(start);
+
         // Copy pixel array to Cuda device
         gpuErrchk( cudaMemcpy(_dev_pixels, _host_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyHostToDevice));
 
         // Run the color-to-gray conversion kernel
-        cudaEventRecord(start);
         color2gvp<<<blocks, threadsPerBlock>>>(_dev_pixels, _colorSpace, _rows, _cols);
+
+        // Copy pixel array back to host
+        gpuErrchk(cudaMemcpy(_host_pixels, _dev_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyDeviceToHost));
         cudaEventRecord(stop);
 
         // Check if the Kernel produced any errors
@@ -268,13 +273,8 @@ float Image::dev_color2gvp(dim3 blocks, dim3 threadsPerBlock)
         cudaEventSynchronize(stop);
         cudaEventElapsedTime(&miliseconds, start, stop);
 
-        // Copy pixel array back to host
-        gpuErrchk(cudaMemcpy(_host_pixels, _dev_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyDeviceToHost));
-
         // Free allocated cuda-device memory
         cudaFree(_dev_pixels); 
-
-
 
         _colorSpace = colorSpace::gvp;
         return miliseconds;
@@ -428,16 +428,17 @@ float Image::dev_rgb2hsv(dim3 blocks, dim3 threadsPerBlock)
 
                 gpuErrchk( cudaMalloc((void**)&_dev_pixels, _rows*_cols*3*sizeof(unsigned char)));
 
-                gpuErrchk( cudaMemcpy(_dev_pixels, _host_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyHostToDevice));
-
+                //Begin benchmark
                 cudaEventRecord(start);
-                rgb2hsv<<<blocks, threadsPerBlock>>>(_dev_pixels, _rows, _cols);
-                cudaEventRecord(stop);
 
+                gpuErrchk( cudaMemcpy(_dev_pixels, _host_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyHostToDevice));
+                rgb2hsv<<<blocks, threadsPerBlock>>>(_dev_pixels, _rows, _cols);
                 gpuErrchk(cudaGetLastError());
 
                 gpuErrchk(cudaMemcpy(_host_pixels, _dev_pixels, _rows*_cols*3*sizeof(unsigned char), cudaMemcpyDeviceToHost));
 
+                //Stop benchmark
+                cudaEventRecord(stop);
                 cudaFree(_dev_pixels);
                 
                 cudaEventSynchronize(stop);

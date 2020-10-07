@@ -44,7 +44,7 @@ Histogram::Histogram(Image& src, int host)
 
 float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
 {
-    float miliseconds = 0, ms1 = 0, ms2 = 0, ms3 = 0, ms4 = 0, ms5 = 0;
+    float miliseconds = 0, ms1 = 0, ms2 = 0;
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
@@ -80,27 +80,26 @@ float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
     gpuErrchk( cudaMalloc((void**)& _dev_valuesCumulative, _numValues*sizeof(double)));    
     gpuErrchk( cudaMalloc((void**)& g_partialHistograms, _numValues*blocks.x*sizeof(int)));
 
+    // Begin benchmark
+    cudaEventRecord(start);
 
     gpuErrchk( cudaMemcpy(_dev_pixels, _src.getHostPixelPtr(), numPixels*sizeof(unsigned char), cudaMemcpyHostToDevice));
     gpuErrchk( cudaMemcpy(_dev_values, _host_values, _numValues*sizeof(int), cudaMemcpyHostToDevice));
-    gpuErrchk( cudaMemcpy(_dev_valuesCumulative, _host_valuesCumulative, _numValues*sizeof(double), cudaMemcpyHostToDevice));
    
     // Histogram
-    cudaEventRecord(start);
     partialHistograms<<<blocks, threadsPerBlock, _numValues*sizeof(int)>>>(_dev_pixels, g_partialHistograms, _numValues, rows, cols, channels);
     cudaEventRecord(stop);
     gpuErrchk(cudaGetLastError());
 
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&ms1, start, stop);
-    
-    cudaEventRecord(start);
     globalHistogram<<<blocks, threadsPerBlock>>>(g_partialHistograms, _dev_values, _numValues, blocks.x);
     gpuErrchk(cudaGetLastError());
+
+    // Stop benchmark
+    gpuErrchk(cudaMemcpy(_host_values, _dev_values, _numValues*sizeof(int), cudaMemcpyDeviceToHost));
     cudaEventRecord(stop);
 
     cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&ms2, start, stop);
+    cudaEventElapsedTime(&ms1, start, stop);
 
     // Cumulative Histogram:
     // In the next Kernel, each block scans numValues/n elements, n is the size of the padded array (in the case that numValues is not a multiple of the number of blocks)
@@ -110,32 +109,27 @@ float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
     gpuErrchk( cudaMalloc((void**)& g_partialCumulative, n*sizeof(int)));
     gpuErrchk( cudaMalloc((void**)& sums, n*sizeof(int)/nPartial));
 
+    // Begin benchmark
     cudaEventRecord(start);
+
+    gpuErrchk( cudaMemcpy(_dev_valuesCumulative, _host_valuesCumulative, _numValues*sizeof(double), cudaMemcpyHostToDevice));
+
     partialCumulativeHistograms<<<n/nPartial, nPartial/2, nPartial*sizeof(int)>>>(_dev_values, g_partialCumulative, sums, n, nPartial);
-    cudaEventRecord(stop);
     gpuErrchk( cudaGetLastError());
 
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&ms3, start, stop);
-
-    cudaEventRecord(start);
     auxiliaryCumulativeHistogram<<<1, n/(2*nPartial), n*sizeof(int)/nPartial>>>(sums, n/nPartial);
-    cudaEventRecord(stop);
     gpuErrchk( cudaGetLastError());
-
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&ms4, start, stop);
     
-    cudaEventRecord(start);
     globalCumulativeHistogram<<<blocks, threadsPerBlock>>>(g_partialCumulative, sums, _dev_valuesCumulative, _numValues, nPartial, rows, cols);
-    cudaEventRecord(stop);
     gpuErrchk( cudaGetLastError());
 
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&ms5, start, stop);
-
-    gpuErrchk(cudaMemcpy(_host_values, _dev_values, _numValues*sizeof(int), cudaMemcpyDeviceToHost));
     gpuErrchk(cudaMemcpy(_host_valuesCumulative, _dev_valuesCumulative, _numValues*sizeof(double), cudaMemcpyDeviceToHost));
+    
+    // Stop benchmark
+    cudaEventRecord(stop);
+
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&ms2, start, stop);
 
     cudaFree(_dev_pixels);
     cudaFree(_dev_values);
@@ -147,7 +141,7 @@ float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
     //Convert back to RGB if necessary
     _src.dev_yuv2rgb(blocks, threadsPerBlock);
 
-    miliseconds += ms1 + ms2 + ms3 + ms4 + ms5;
+    miliseconds += ms1 + ms2;
 
     return miliseconds;
 }
@@ -223,7 +217,7 @@ void Histogram::display(ostream& output)
 
 float Histogram::dev_equalize(dim3 blocks, dim3 threadsPerBlock)
 {
-    float miliseconds = 0, ms1 = 0, ms2 =0;
+    float miliseconds = 0;
     cudaEvent_t start, stop; 
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
@@ -244,35 +238,32 @@ float Histogram::dev_equalize(dim3 blocks, dim3 threadsPerBlock)
     gpuErrchk(cudaMalloc((void**)& _dev_pixels, numPixels*sizeof(unsigned char)));
     gpuErrchk(cudaMalloc((void**)& _dev_valuesCumulative, _numValues*sizeof(double)));
 
+
+    // Beginn benchmark 
+    cudaEventRecord(start);
+
     gpuErrchk(cudaMemcpy(_dev_lookUpTable, _host_lookUpTable, _numValues*sizeof(unsigned char), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(_dev_pixels, host_pixelPtr, numPixels*sizeof(unsigned char), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(_dev_valuesCumulative, _host_valuesCumulative, _numValues*sizeof(double),cudaMemcpyHostToDevice));
-    
-    cudaEventRecord(start);
+
     equalizationLookUpTable<<<1, 256, _numValues*sizeof(unsigned char)>>>(_dev_lookUpTable, _dev_valuesCumulative, _numValues);
-    cudaEventRecord(stop);
     gpuErrchk(cudaGetLastError());
 
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&ms1, start, stop);
-
-    cudaEventRecord(start);
     updatePixelsFromLookUp<<<blocks, threadsPerBlock>>>(_dev_pixels, _dev_lookUpTable, rows, cols, channels);
-    cudaEventRecord(stop);
     gpuErrchk(cudaGetLastError());
-
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&ms2, start, stop);
 
     gpuErrchk(cudaMemcpy(_host_lookUpTable, _dev_lookUpTable, _numValues*sizeof(unsigned char), cudaMemcpyDeviceToHost));
     gpuErrchk(cudaMemcpy( host_pixelPtr, _dev_pixels, numPixels*sizeof(unsigned char), cudaMemcpyDeviceToHost));
-    gpuErrchk(cudaMemcpy(_host_valuesCumulative, _dev_valuesCumulative, _numValues*sizeof(double), cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(_host_valuesCumulative, _dev_valuesCumulative, _numValues*sizeof(double), cudaMemcpyDeviceToHost));    
+    
+    // Stop benchmark
+    cudaEventRecord(stop);
 
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&miliseconds, start, stop);
     cudaFree(_dev_lookUpTable);
     cudaFree(_dev_pixels);
     cudaFree(_dev_valuesCumulative);
-
-    miliseconds += ms1 + ms2;
 
     miliseconds += dev_getHistogram(blocks, threadsPerBlock);
 
@@ -320,7 +311,7 @@ void Histogram::host_equalize()
 
 float Histogram::dev_normalize(dim3 blocks, dim3 threadsPerBlock)
 {
-    float miliseconds=0, ms1 = 0, ms2 = 0;
+    float miliseconds=0;
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
@@ -342,32 +333,30 @@ float Histogram::dev_normalize(dim3 blocks, dim3 threadsPerBlock)
     gpuErrchk(cudaMalloc((void**)& _dev_lookUpTable, _numValues*sizeof(unsigned char)));
     gpuErrchk(cudaMalloc((void**)& _dev_pixels, numPixels*sizeof(unsigned char)));
 
+
+    // Begin benchmark    
+    cudaEventRecord(start);
+    
     gpuErrchk(cudaMemcpy(_dev_lookUpTable, _host_lookUpTable, _numValues*sizeof(unsigned char), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(_dev_pixels, host_pixelPtr, numPixels*sizeof(unsigned char), cudaMemcpyHostToDevice));
     
-    cudaEventRecord(start);
     normalizationLookUpTable<<<1, 256, _numValues*sizeof(unsigned char)>>>(_dev_lookUpTable,_numValues, maxPixel, minPixel);
-    cudaEventRecord(stop);
     gpuErrchk(cudaGetLastError());
 
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&ms1, start, stop);
-
-    cudaEventRecord(start);
     updatePixelsFromLookUp<<<blocks, threadsPerBlock>>>(_dev_pixels, _dev_lookUpTable, rows, cols, channels);
-    cudaEventRecord(stop);
     gpuErrchk(cudaGetLastError());
-
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&ms2, start, stop);
 
     gpuErrchk(cudaMemcpy(_host_lookUpTable, _dev_lookUpTable, _numValues*sizeof(unsigned char), cudaMemcpyDeviceToHost));
     gpuErrchk(cudaMemcpy( host_pixelPtr, _dev_pixels, numPixels*sizeof(unsigned char), cudaMemcpyDeviceToHost));
-    
+
+    // Stop benchmark
+    cudaEventRecord(stop);
+
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&miliseconds, start, stop);
+
     cudaFree(_dev_lookUpTable);
     cudaFree(_dev_pixels); 
-
-    miliseconds += ms1 + ms2;
 
     miliseconds += dev_getHistogram(blocks, threadsPerBlock);
 
