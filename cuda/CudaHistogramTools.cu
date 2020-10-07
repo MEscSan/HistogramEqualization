@@ -100,7 +100,7 @@ float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
     cudaEventRecord(stop1);
 
     cudaEventSynchronize(stop1);
-    cudaEventElapsedTime(&ms1, start1, stop2);
+    cudaEventElapsedTime(&ms1, start1, stop1);
 
     // Cumulative Histogram:
     // In the next Kernel, each block scans numValues/n elements, n is the size of the padded array (in the case that numValues is not a multiple of the number of blocks)
@@ -112,7 +112,6 @@ float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
 
     // Begin benchmark
     cudaEventRecord(start2);
-
     gpuErrchk( cudaMemcpy(_dev_valuesCumulative, _host_valuesCumulative, _numValues*sizeof(double), cudaMemcpyHostToDevice));
 
     partialCumulativeHistograms<<<n/nPartial, nPartial/2, nPartial*sizeof(int)>>>(_dev_values, g_partialCumulative, sums, n, nPartial);
