@@ -31,7 +31,7 @@ void printBenchmark(double cudaTime, int cpu_test, double cpuTime)
 
 }
 
-double CPUColorConversion(string path)
+double CPU_ColorConversionBenchmark(string path)
 {
     clock_t start_t, stop_t;
 
@@ -53,7 +53,7 @@ double CPUColorConversion(string path)
 
 }
 
-double ColorConversionPageableBenchmarking(dim3 blocks, dim3 threadsPerBlock, string path)
+double GPU_ColorConversionPageableBenchmark(dim3 blocks, dim3 threadsPerBlock, string path)
 {
     
     double cuda_RGB2YCbCrTime = 0;
@@ -69,7 +69,7 @@ double ColorConversionPageableBenchmarking(dim3 blocks, dim3 threadsPerBlock, st
     return cuda_RGB2YCbCrTime;
 }
 
-double ColorConversionPinnedBenchmarking(dim3 blocks, dim3 threadsPerBlock, string path)
+double GPU_ColorConversionPinnedBenchmark(dim3 blocks, dim3 threadsPerBlock, string path)
 {
   
     double cuda_RGB2YCbCrTime  = 0; 
@@ -85,7 +85,7 @@ double ColorConversionPinnedBenchmarking(dim3 blocks, dim3 threadsPerBlock, stri
     return cuda_RGB2YCbCrTime;
 }
 
-double ColorConversionUnifiedBenchmarking(dim3 blocks, dim3 threadsPerBlock, string path)
+double GPU_ColorConversionUnifiedBenchmark(dim3 blocks, dim3 threadsPerBlock, string path)
 {
     
     double cuda_RGB2YCbCrTime  = 0; 
@@ -100,7 +100,7 @@ double ColorConversionUnifiedBenchmarking(dim3 blocks, dim3 threadsPerBlock, str
     return cuda_RGB2YCbCrTime;
 }
 
-double CPU_RGB_Histogram(string path)
+double CPU_RGB_HistogramOperationsBenchmark(string path)
 {
     clock_t start_t, stop_t;
     double cpu_histogramTime = 0;
@@ -121,7 +121,7 @@ double CPU_RGB_Histogram(string path)
     return cpu_histogramTime;
 }
 
-double RGB_HistogramOperationsBenchmarking(dim3 blocks, dim3 threadsPerBlock, string path)
+double GPU_RGB_HistogramOperationsBenchmark(dim3 blocks, dim3 threadsPerBlock, string path)
 {
     
     double cuda_histogramTime = 0; 
@@ -141,7 +141,7 @@ double RGB_HistogramOperationsBenchmarking(dim3 blocks, dim3 threadsPerBlock, st
     
 }
 
-double CPU_GVP_Histogram(string path)
+double CPU_GVP_HistogramOperationsBenchmark(string path)
 {
     double cpu_histogramTime = 0;
     clock_t start_t, stop_t;
@@ -162,7 +162,7 @@ double CPU_GVP_Histogram(string path)
     return cpu_histogramTime;
 }
 
-double GVP_HistogramOperationsBenchmarking(dim3 blocks, dim3 threadsPerBlock, string path)
+double GPU_GVP_HistogramOperationsBenchmark(dim3 blocks, dim3 threadsPerBlock, string path)
 {
     
     double cuda_histogramTime = 0; 
@@ -205,6 +205,8 @@ int main(int argc, char* argv[])
     if( argc > 2)
     {
         inputImgPath = argv[2];
+        
+        // Get image format
         inputImgExtension = inputImgPath.substr(inputImgPath.length() - 3, 3); 
     }
 
@@ -215,13 +217,14 @@ int main(int argc, char* argv[])
         // If the input image is an RGB-Image
         if(inputImgExtension == "ppm")
         {
-            cpu_RGB2YCbCrTime = CPUColorConversion(inputImgPath); 
-            cpu_RGB_histogramTime = CPU_RGB_Histogram(inputImgPath);    
+            cpu_RGB2YCbCrTime = CPU_ColorConversionBenchmark
+        (inputImgPath); 
+            cpu_RGB_histogramTime = CPU_RGB_HistogramOperationsBenchmark(inputImgPath);    
         }
         // If the input image is a grey-value-picture
         else if(inputImgExtension == "pgm")
         {
-            cpu_GVP_histogramTime = CPU_GVP_Histogram(inputImgPath);
+            cpu_GVP_histogramTime = CPU_GVP_HistogramOperationsBenchmark(inputImgPath);
         }
         // Default-Benchmark with both RGB and grey-value images
         else
@@ -229,11 +232,11 @@ int main(int argc, char* argv[])
             for(int i = 0; i < 21; i++ )
             {
                 string defaultPath = inputImgPath + std::to_string(i) +".ppm";
-                cpu_RGB2YCbCrTime += CPUColorConversion(defaultPath); 
-                cpu_RGB_histogramTime += CPU_RGB_Histogram(defaultPath);
+                cpu_RGB2YCbCrTime += CPU_ColorConversionBenchmark(defaultPath); 
+                cpu_RGB_histogramTime += CPU_RGB_HistogramOperationsBenchmark(defaultPath);
 
                 defaultPath = inputImgPath + std::to_string(i) +".pgm";
-                cpu_GVP_histogramTime += CPU_GVP_Histogram(defaultPath);
+                cpu_GVP_histogramTime += CPU_GVP_HistogramOperationsBenchmark(defaultPath);
             }
         }
     }
@@ -257,14 +260,14 @@ int main(int argc, char* argv[])
     if(inputImgExtension == "ppm" )
     {
 
-        cout<<"\n\nColor Conversion using Unified memory\n";
+        cout<<"\n\nColor Conversion using unified memory\n";
         cout<<"Blocks \tThreads\t";
         cout<<"GPU[ms]\tCPU[ms]\tSpeedUp(Cuda-Device with respect to CPU)\n";     
         for(int threadsPerBlock = 32; threadsPerBlock<512; threadsPerBlock*=2)
         {
             int blocks = numSM*maxThreadsPerSM/threadsPerBlock;
             cout<< blocks<<'\t' << threadsPerBlock;
-            cuda_RGB2YCbCrTime = ColorConversionUnifiedBenchmarking(blocks, threadsPerBlock, inputImgPath);
+            cuda_RGB2YCbCrTime = GPU_ColorConversionUnifiedBenchmark(blocks, threadsPerBlock, inputImgPath);
             printBenchmark(cuda_RGB2YCbCrTime, cpu_test, cpu_RGB2YCbCrTime);
         }
         
@@ -276,7 +279,7 @@ int main(int argc, char* argv[])
         {
             int blocks = numSM*maxThreadsPerSM/threadsPerBlock;
             cout<< blocks<<'\t' << threadsPerBlock;
-            cuda_RGB2YCbCrTime = ColorConversionPageableBenchmarking(blocks, threadsPerBlock, inputImgPath);
+            cuda_RGB2YCbCrTime = GPU_ColorConversionPageableBenchmark(blocks, threadsPerBlock, inputImgPath);
             printBenchmark(cuda_RGB2YCbCrTime, cpu_test, cpu_RGB2YCbCrTime);
         }
 
@@ -288,7 +291,7 @@ int main(int argc, char* argv[])
         {
             int blocks = numSM*maxThreadsPerSM/threadsPerBlock;
             cout<< blocks<<'\t' << threadsPerBlock;
-            cuda_RGB2YCbCrTime = ColorConversionPinnedBenchmarking(blocks, threadsPerBlock, inputImgPath);
+            cuda_RGB2YCbCrTime = GPU_ColorConversionPinnedBenchmark(blocks, threadsPerBlock, inputImgPath);
             printBenchmark(cuda_RGB2YCbCrTime, cpu_test, cpu_RGB2YCbCrTime);
         }
 
@@ -300,7 +303,7 @@ int main(int argc, char* argv[])
         {
             int blocks = numSM*maxThreadsPerSM/threadsPerBlock;
             cout<< blocks<<'\t' << threadsPerBlock;    
-            cuda_RGB_histogramTime = RGB_HistogramOperationsBenchmarking(blocks, threadsPerBlock, inputImgPath);
+            cuda_RGB_histogramTime = GPU_RGB_HistogramOperationsBenchmark(blocks, threadsPerBlock, inputImgPath);
             printBenchmark(cuda_RGB_histogramTime, cpu_test, cpu_RGB_histogramTime);
         }
 
@@ -308,7 +311,7 @@ int main(int argc, char* argv[])
     // If the input image is a grey-value-picture
     else if(inputImgExtension == "pgm")
     {
-        cout<<"\nHistograms on grey value images\n";
+        cout<<"\n\nHistograms on grey value images\n";
         
         cout<<"Blocks \tThreads\t";
         cout<<"GPU[ms]\tCPU[ms]\tSpeedUp(Cuda-Device with respect to CPU)\n";   
@@ -317,7 +320,7 @@ int main(int argc, char* argv[])
             int blocks = numSM*maxThreadsPerSM/threadsPerBlock;
 
             cout<< blocks<<'\t' << threadsPerBlock;
-            cuda_GVP_histogramTime = GVP_HistogramOperationsBenchmarking(blocks, threadsPerBlock, inputImgPath);     
+            cuda_GVP_histogramTime = GPU_GVP_HistogramOperationsBenchmark(blocks, threadsPerBlock, inputImgPath);     
             printBenchmark(cuda_GVP_histogramTime, cpu_test, cpu_GVP_histogramTime);
         }
     }
@@ -338,7 +341,7 @@ int main(int argc, char* argv[])
             for(int i = 0; i < 21; i++ )
             {
                 defaultPath = inputImgPath + std::to_string(i) +".ppm";
-                cuda_RGB2YCbCrTime += ColorConversionUnifiedBenchmarking(blocks, threadsPerBlock, defaultPath);
+                cuda_RGB2YCbCrTime += GPU_ColorConversionUnifiedBenchmark(blocks, threadsPerBlock, defaultPath);
             }
 
             printBenchmark(cuda_RGB2YCbCrTime, cpu_test, cpu_RGB2YCbCrTime);
@@ -356,7 +359,7 @@ int main(int argc, char* argv[])
             for(int i = 0; i < 21; i++ )
             {
                 defaultPath = inputImgPath + std::to_string(i) +".ppm";
-                cuda_RGB2YCbCrTime += ColorConversionPageableBenchmarking(blocks, threadsPerBlock, defaultPath);
+                cuda_RGB2YCbCrTime += GPU_ColorConversionPageableBenchmark(blocks, threadsPerBlock, defaultPath);
             }
 
             printBenchmark(cuda_RGB2YCbCrTime, cpu_test, cpu_RGB2YCbCrTime);
@@ -374,7 +377,7 @@ int main(int argc, char* argv[])
             for(int i = 0; i < 21; i++ )
             {
                 defaultPath = inputImgPath + std::to_string(i) +".ppm";
-                cuda_RGB2YCbCrTime += ColorConversionPinnedBenchmarking(blocks, threadsPerBlock, defaultPath);
+                cuda_RGB2YCbCrTime += GPU_ColorConversionPinnedBenchmark(blocks, threadsPerBlock, defaultPath);
             }
             printBenchmark(cuda_RGB2YCbCrTime, cpu_test, cpu_RGB2YCbCrTime);
         }
@@ -391,7 +394,7 @@ int main(int argc, char* argv[])
             for(int i = 0; i < 21; i++ )
             {
                 defaultPath = inputImgPath + std::to_string(i) +".ppm";
-                cuda_RGB_histogramTime += RGB_HistogramOperationsBenchmarking(blocks, threadsPerBlock, defaultPath);
+                cuda_RGB_histogramTime += GPU_RGB_HistogramOperationsBenchmark(blocks, threadsPerBlock, defaultPath);
             }
             printBenchmark(cuda_RGB_histogramTime, cpu_test, cpu_RGB_histogramTime);
         }
@@ -409,7 +412,7 @@ int main(int argc, char* argv[])
             for(int i = 0; i < 21; i++ )
             {
                 defaultPath = inputImgPath + std::to_string(i) +".pgm";
-                cuda_GVP_histogramTime += GVP_HistogramOperationsBenchmarking(blocks, threadsPerBlock, defaultPath);     
+                cuda_GVP_histogramTime += GPU_GVP_HistogramOperationsBenchmark(blocks, threadsPerBlock, defaultPath);     
             }
             printBenchmark(cuda_GVP_histogramTime, cpu_test, cpu_GVP_histogramTime);
         }

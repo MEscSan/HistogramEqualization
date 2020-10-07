@@ -88,7 +88,6 @@ float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
    
     // Histogram
     partialHistograms<<<blocks, threadsPerBlock, _numValues*sizeof(int)>>>(_dev_pixels, g_partialHistograms, _numValues, rows, cols, channels);
-    cudaEventRecord(stop);
     gpuErrchk(cudaGetLastError());
 
     globalHistogram<<<blocks, threadsPerBlock>>>(g_partialHistograms, _dev_values, _numValues, blocks.x);

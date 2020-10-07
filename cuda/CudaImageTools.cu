@@ -25,6 +25,7 @@ Image::Image(int rows, int cols, colorSpace cs, int numValues, fileType type)
         _rows = rows;
         _cols = cols;
         _type = type;
+        _colorSpace = cs;
 
         // Images in pbm-format have by default only one color (binary images with two possible values: 0 and 1)
         if(type == fileType::pbmASCII || type == fileType::pbmBin)
@@ -36,7 +37,6 @@ Image::Image(int rows, int cols, colorSpace cs, int numValues, fileType type)
                 _numValues = numValues;
         }
 
-        // Grey value pictures have  
         if(cs == colorSpace::gvp)
         {
                 _channels = 1;
@@ -50,13 +50,9 @@ Image::Image(int rows, int cols, colorSpace cs, int numValues, fileType type)
         
         unsigned char* pixelPtr = _host_pixels;
 
-        // Fill the pixels with random values
-        // Initialize Random number generator
-        srand(time(NULL));
-
         for (int i = 0; i < _rows*_cols*_channels; i++)
         {
-                *pixelPtr= (char) rand()%numValues;
+                *pixelPtr= 0;
                 pixelPtr++;
         }
         
@@ -119,11 +115,10 @@ Image Image::getChannel(int c)
 // Does nothing if the input Image-object doesn't have the right dimensions or is a color-picture
 void Image::setChannel(Image channel, int c)
 {
-        if(channel.getCols()==_cols, channel.getRows()==_rows && channel.getColorSpace() == colorSpace::gvp)
+        if((channel.getCols()==_cols) && (channel.getRows()==_rows) && channel.getColorSpace() == colorSpace::gvp)
         {
                 unsigned char* srcPtr = (unsigned char*)channel.getHostPixelPtr();
-
-                // c can only have values from 0 to channels-1
+                // c can only have values from 0 to channels-1                
                 c = host_clamp(c, 0, _channels-1);
                 for (int i = c; i < _rows*_cols*_channels; i+=_channels)
                 {
@@ -557,11 +552,11 @@ float Image::dev_yuv2rgb_unified(dim3 blocks, dim3 threadsPerBlock)
                 // Begin benchmark
                 cudaEventRecord(start);
                 yuv2rgb<<<blocks, threadsPerBlock>>>(_host_pixels, _rows, _cols);
+                cudaDeviceSynchronize();               
+
                 // Stop benchmark
                 cudaEventRecord(stop); 
 
-                cudaDeviceSynchronize();               
-                
                 cudaEventSynchronize(stop);
                 cudaEventElapsedTime(&miliseconds, start, stop);  
 
