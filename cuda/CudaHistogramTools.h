@@ -1,3 +1,12 @@
+/*
+    Small class to get, normalize and equalize histograms. For image representation it relies on the Image class (see CudaImageTools for implementation details)
+    Histograms, Equalization and Normalization can be run either on the cpu or the gpu
+
+    Remark: all methods and functions with the prefix host_ are run on the cpu
+            all methods and functions with the prefic dev_ are either run on the CUDA device or contain the memory allocation, copy and kernel call to run 
+            algorithms on the CUDA device
+*/
+
 #pragma once 
 
 #include <cstdlib>
@@ -16,6 +25,17 @@ using namespace std;
 class Histogram
 {
     private:
+
+        /* 
+            Properties:
+            -> number of grey values used to build the histogram
+            -> pointers to the "raw" histogram (number of pixels containing a certain grey value) in both host and CUDA device (dev) memory
+            -> pointers to the cumulative histogram (normalized to the interval [0,1]) in both host and CUDA device (dev) memory
+            -> pointers to the lookup table with the new values corresponding to each of the original grey values after normalization/equalization in both host and CUDA device (dev) memory
+            -> pointer to the pixels of the source image on the CUDA device memory 
+            -> minimun and maximum grey value in the source image
+            -> source image as (pointer to) Image-object
+	    */
         int _numValues;
         int* _host_values;
         int* _dev_values;
@@ -31,24 +51,32 @@ class Histogram
         Image& _src;
 
     public:
+
+        // Histogram calculation is run by default whithin the constructor, the input parameter host allows to decide
+        // whether to run it on the CUDA device (0, default) or on the cpu
         Histogram(Image& src, int host=0);
 
+        // Get both histogram and cumulative histogram of the source Image
         float dev_getHistogram(dim3 blocks = 48, dim3 threadsPerBlock = 128);
         void host_getHistogram();
         
+        // Display histogram (vertically) on a stream (f.e. a file or the console)
         void display(ostream& output = cout);    
         
+        // Equalize source Image and histogram 
         float dev_equalize(dim3 blocks = 48, dim3 threadsPerBlock = 128);
         void host_equalize();
         
+        // Normalize source Image and histogram
         float dev_normalize(dim3 blocks = 48, dim3 threadsPerBlock = 128);
         void host_normalize();
 
+        // Save histogram, cumulative histogram and vertical graphical representation into a .txt file under path
         void save(string path);
 
 };
 
-// Gets the maxmimum histogram-value
+// Gets the biggest grey value of an image (int and unsigned char verion)
 inline int getMax(int* arrayPtr, int arraySize, colorSpace cs = colorSpace::gvp)
 {
     int maxVal = 0;
@@ -63,6 +91,7 @@ inline int getMax(int* arrayPtr, int arraySize, colorSpace cs = colorSpace::gvp)
             }
         }
     }
+    // If source is color Image (YCbCr) consider only the Y-Channel
     else
     {
         for (int i = 0; i < arraySize; i+=3)
@@ -90,6 +119,7 @@ inline unsigned char getMax(unsigned char* arrayPtr, int arraySize, colorSpace c
             }
         }
     }
+    // If source is color Image (YCbCr) consider only the Y-Channel
     else
     {
         for (int i = 0; i < arraySize; i+=3)
@@ -105,6 +135,7 @@ inline unsigned char getMax(unsigned char* arrayPtr, int arraySize, colorSpace c
     return maxVal;
 }
 
+// Get the smallest grey value of an image
 inline unsigned char getMin(unsigned char* arrayPtr, int arraySize, colorSpace cs = colorSpace::gvp)
 {
     unsigned char minVal = _SC_UCHAR_MAX;
@@ -119,6 +150,7 @@ inline unsigned char getMin(unsigned char* arrayPtr, int arraySize, colorSpace c
             }
         }        
     }
+    // If source is color Image (YCbCr) consider only the Y-Channel
     else
     {
         for (int i = 0; i < arraySize; i+=3)
@@ -132,9 +164,6 @@ inline unsigned char getMin(unsigned char* arrayPtr, int arraySize, colorSpace c
     
     return minVal;
 }
-
-__device__ int dev_getMax(int* arrayPtr, int arraySize, colorSpace cs = colorSpace::gvp);
-__device__ unsigned char dev_getMax(unsigned char* arrayPtr, int arraySize, colorSpace cs = colorSpace::gvp);
 
 __global__ void getHistogram(unsigned char* pixelPtr, int* values, double* valuesCumulative, unsigned char* lookUpTable,  int rows, int cols, colorSpace color);
 

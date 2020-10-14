@@ -58,6 +58,8 @@ Image::Image(int rows, int cols, colorSpace cs, int numValues, fileType type)
         
 }
 
+// Get and set methods for rows, cols, number of values, pixel pointer in host machine memory (host_) and CUDA device (dev_) and color space
+
 int Image::getRows()
 {
         return _rows;

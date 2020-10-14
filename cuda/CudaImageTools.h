@@ -1,7 +1,10 @@
 /*
     Small library with a minimal class and methods required for manipulating, loading and saving images in netpbm formats (.pbm, .pgm, .ppm)
-    In this Cuda-version all interactions with external files are run by the host, 
-    color space conversions, on the contrary, are run on the Cuda-device
+    All interactions with external files are run by the host, color space conversions can be run either on the cpu or on the CUDA device
+
+    Remark: all methods and functions with the prefix host_ are run on the cpu
+            all methods and functions with the prefic dev_ are either run on the CUDA device or contain the memory allocation, copy and kernel call to run 
+            algorithms on the CUDA device
 */
 #pragma once 
 
@@ -254,13 +257,14 @@ inline header getHeader(FILE* src)
     return srcHeader;
 }
 
-// FUnctions to be run on the cuda-device
+// Functions to be run on the cuda-device
 __global__ void color2gvp(unsigned char* pixels_ptr, colorSpace color, int rows, int cols);
 __global__ void rgb2yuv(unsigned char* pixels_ptr, int rows, int cols);
 __global__ void yuv2rgb(unsigned char* pixels_ptr, int rows, int cols);
 __global__ void rgb2hsv(unsigned char* pixels_ptr, int rows, int cols);
 
 // Keeps the given value x within the boundaries [min, max](used mainly in the double-to-byte conversion)  
+// double- and  int-version to be run both on cpu (host_) and CUDA device (dev_)
 inline __host__ double host_clamp(double x, double min=0, double max=255)
 {
     double y = x;
@@ -291,7 +295,6 @@ inline __host__ int host_clamp(int x, int min=0, int max=255)
     return y;
 }
 
-// Makes sure x remains within the interval [min, max]
 inline __device__ double dev_clamp(double x, double min = 0, double max = 255)
 {
 

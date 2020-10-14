@@ -14,10 +14,21 @@
 
 using namespace std;
 
+/* 
+    Remark: all methods and functions with the prefix host_ are run on the cpu
+            all methods and functions with the prefic dev_ are either run on the CUDA device or contain the memory allocation, copy and kernel call to run 
+            algorithms on the CUDA device
+
+            all variables with the prefix g_ refer to global memory in CUDA device
+            all variables with the prefix s_ refer to shared memory in CUDA device
+            
+            execution time = parallel algorithm execution time on CUDA device + device-to-host copy time + host-to-device copy time
+*/            
 Histogram::Histogram(Image& src, int host)
     :_src(src)
 {
-    
+    // By default ist the number-of-values parameter in RGB .ppm images "255"
+    // For histogram calculations, this value has to be corrected to 256 => [0;255]
     if(_src.getNumberOfValues() == 255)
     {
         _numValues = 256;
@@ -26,11 +37,13 @@ Histogram::Histogram(Image& src, int host)
     {
         _numValues = _src.getNumberOfValues();
     }
+
     _dev_pixels = _src.getDevPixelPtr();
     _host_values = new int[_numValues];
     _host_valuesCumulative = new double[_numValues];
     _host_lookUpTable = new unsigned char[_numValues]; 
 
+    // Build histogram and cumulative histogram on the cpu or the CUDA device according to "host" parameter
     if(host)
     {
         host_getHistogram();
@@ -42,23 +55,37 @@ Histogram::Histogram(Image& src, int host)
 
 }
 
+// Build histogram and cumulative histogram on CUDA device
+// Return the execution time
 float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
 {
+    // Initialize timing variables
     float miliseconds = 0, ms1 = 0, ms2 = 0;
+
+    // Initialize CUDA events for timing
     cudaEvent_t start1, start2, stop1, stop2;
     cudaEventCreate(&start1);
     cudaEventCreate(&start2);
     cudaEventCreate(&stop1);
     cudaEventCreate(&stop2);
 
+    // Get Image dimensions from source
     int rows = _src.getRows();
     int cols = _src.getCols();
     int channels = _src.getNumberOfChannels();
     double numPixels = rows*cols*channels;
 
+    // Get pointer to Image pixels from source
     unsigned char* pixelPtr = (unsigned char*)_src.getHostPixelPtr();
+
+    // Histogram is built in two steps according to https://developer.nvidia.com/blog/gpu-pro-tip-fast-histograms-using-shared-atomics-maxwell/
+    // Pointer to global CUDA device memory with partial histograms
     int* g_partialHistograms;
+
+    // Cumulative histogram is built in three steps according to "GPU Gems 3", chapter 39 (Parallel Prefix Sum (Scan) with CUDA), section 39.2.4
+    // Pointer to global CUDA device memory with partial cumulative histograms 
     int* g_partialCumulative;
+    // Pointer to global CUDA device memory with offsets for distributed cumulative histogram calculation
     int* sums;
 
     //Reset histogram- and cumulative-histogram-array with 0s
@@ -70,7 +97,7 @@ float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
 
     }
 
-    // RGB-Images are transformed to YUV-Color space; the histogram-class only takes the y-channel (luminance) into account
+    // RGB-Images are transformed to YCbCr-Color space; the histogram-class only takes the y-channel (luminance) into account
     if(_src.getColorSpace()== colorSpace::rgb)
     {
         miliseconds += _src.dev_rgb2yuv(blocks, threadsPerBlock);
@@ -88,10 +115,10 @@ float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
     gpuErrchk( cudaMemcpy(_dev_pixels, _src.getHostPixelPtr(), numPixels*sizeof(unsigned char), cudaMemcpyHostToDevice));
     gpuErrchk( cudaMemcpy(_dev_values, _host_values, _numValues*sizeof(int), cudaMemcpyHostToDevice));
    
-    // Histogram
+    // Build partial histogram
     partialHistograms<<<blocks, threadsPerBlock, _numValues*sizeof(int)>>>(_dev_pixels, g_partialHistograms, _numValues, rows, cols, channels);
     gpuErrchk(cudaGetLastError());
-
+    //  Build global histogram
     globalHistogram<<<blocks, threadsPerBlock>>>(g_partialHistograms, _dev_values, _numValues, blocks.x);
     gpuErrchk(cudaGetLastError());
 
@@ -103,23 +130,26 @@ float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
     cudaEventElapsedTime(&ms1, start1, stop1);
 
     // Cumulative Histogram:
-    // In the next Kernel, each block scans numValues/n elements, n is the size of the padded array (in the case that numValues is not a multiple of the number of blocks)
+    // In the next Kernel, each block scans numValues/n elements, n is the number of grey values in the histogram
+    // (in the case that numValues is not a multiple of the number of blocks)
     int n = _numValues;
     int nPartial =  128;
 
+    // Allocate device memory
     gpuErrchk( cudaMalloc((void**)& g_partialCumulative, n*sizeof(int)));
     gpuErrchk( cudaMalloc((void**)& sums, n*sizeof(int)/nPartial));
 
     // Begin benchmark
     cudaEventRecord(start2);
-    gpuErrchk( cudaMemcpy(_dev_valuesCumulative, _host_valuesCumulative, _numValues*sizeof(double), cudaMemcpyHostToDevice));
 
+    gpuErrchk( cudaMemcpy(_dev_valuesCumulative, _host_valuesCumulative, _numValues*sizeof(double), cudaMemcpyHostToDevice));
+    // Build partial cumulative histograms 
     partialCumulativeHistograms<<<n/nPartial, nPartial/2, nPartial*sizeof(int)>>>(_dev_values, g_partialCumulative, sums, n, nPartial);
     gpuErrchk( cudaGetLastError());
-
+    // Build auxiliary array with the offsets to be appliead to each of the partial cumulative histograms
     auxiliaryCumulativeHistogram<<<1, n/(2*nPartial), n*sizeof(int)/nPartial>>>(sums, n/nPartial);
     gpuErrchk( cudaGetLastError());
-    
+    // join all partial cumulatives histogram to a global cumulative histogram
     globalCumulativeHistogram<<<blocks, threadsPerBlock>>>(g_partialCumulative, sums, _dev_valuesCumulative, _numValues, nPartial, rows, cols);
     gpuErrchk( cudaGetLastError());
 
@@ -131,6 +161,7 @@ float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
     cudaEventSynchronize(stop2);
     cudaEventElapsedTime(&ms2, start2, stop2);
 
+    // Free allocated space on CUDA device
     cudaFree(_dev_pixels);
     cudaFree(_dev_values);
     cudaFree(_dev_valuesCumulative);
@@ -146,13 +177,16 @@ float Histogram::dev_getHistogram(dim3 blocks, dim3 threadsPerBlock)
     return miliseconds;
 }
 
+// Build histogram and cumulative histogram sequentially on the cpu
 void Histogram::host_getHistogram()
 {
+    // Get Image dimensions from source
     int rows = _src.getRows();
     int cols = _src.getCols();
     int channels = _src.getNumberOfChannels();
     double numPixels = rows*cols*channels;
-
+    
+    // Get pointer to Image pixels from source
     unsigned char* pixelPtr = (unsigned char*)_src.getHostPixelPtr();
     unsigned char value = 0;
  
@@ -173,15 +207,14 @@ void Histogram::host_getHistogram()
         _src.host_rgb2yuv();
     }
 
-    // Histogram
+    // Build histogram
     for (int i = 0; i < numPixels; i+=channels)
     {
         value = pixelPtr[i];
         _host_values[value]++; 
     }
 
-    // Cumulative histogram
-
+    // Build normalized cumulative histogram (values in interval [0;1])
     // For the cumulative histogram the number of channels is no longer relevant
     numPixels = rows*cols;
     double cdfval=0;
@@ -196,6 +229,7 @@ void Histogram::host_getHistogram()
     _src.host_yuv2rgb();
 }
 
+// Display histogram (y-axis -> grey value; x-axes -> normalized frequency of each value)
 void Histogram::display(ostream& output)
 {
     int maxVal = getMax(_host_values, _numValues, _src.getColorSpace());
@@ -215,25 +249,34 @@ void Histogram::display(ostream& output)
     
 }
 
+// Equalize image on CUDA device
+// Return execution time
 float Histogram::dev_equalize(dim3 blocks, dim3 threadsPerBlock)
 {
-    float miliseconds = 0, ms1 = 0 ;
+    // Initialize timing variables
+    float miliseconds = 0, ms1 = 0;
+
+    // Initialize CUDA events for timing
     cudaEvent_t start, stop; 
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
-    //Load the normalized color-values into a lookup table assuming a minimum value 0 and a maximum equals the number of values
+    // Get Image dimensions from Source
     int rows = _src.getRows();
     int cols = _src.getCols();
     int channels = _src.getNumberOfChannels();
     int numPixels = rows*cols*channels;
+
+    // Get pointer to Image pixels
     unsigned char* host_pixelPtr = (unsigned char*)_src.getHostPixelPtr(); 
 
+    //Convert to YCbCr color space if necessary
     if(_src.getColorSpace()==colorSpace::rgb)
     {
         miliseconds += _src.dev_rgb2yuv(blocks, threadsPerBlock);
     }
 
+    // Allocate memory on CUDA device
     gpuErrchk(cudaMalloc((void**)& _dev_lookUpTable, _numValues*sizeof(unsigned char)));
     gpuErrchk(cudaMalloc((void**)& _dev_pixels, numPixels*sizeof(unsigned char)));
     gpuErrchk(cudaMalloc((void**)& _dev_valuesCumulative, _numValues*sizeof(double)));
@@ -245,9 +288,10 @@ float Histogram::dev_equalize(dim3 blocks, dim3 threadsPerBlock)
     gpuErrchk(cudaMemcpy(_dev_pixels, host_pixelPtr, numPixels*sizeof(unsigned char), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(_dev_valuesCumulative, _host_valuesCumulative, _numValues*sizeof(double),cudaMemcpyHostToDevice));
 
+    // The normalized cumulative histogram is used as a lookup-table to get the new color values
     equalizationLookUpTable<<<1, 256, _numValues*sizeof(unsigned char)>>>(_dev_lookUpTable, _dev_valuesCumulative, _numValues);
     gpuErrchk(cudaGetLastError());
-
+    // Update Image pixels replacing their values with the ones in the look up table
     updatePixelsFromLookUp<<<blocks, threadsPerBlock>>>(_dev_pixels, _dev_lookUpTable, rows, cols, channels);
     gpuErrchk(cudaGetLastError());
 
@@ -260,11 +304,14 @@ float Histogram::dev_equalize(dim3 blocks, dim3 threadsPerBlock)
 
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&ms1, start, stop);
+
+    // Free allocated CUDA device memory
     cudaFree(_dev_lookUpTable);
     cudaFree(_dev_pixels);
     cudaFree(_dev_valuesCumulative);
 
     miliseconds += ms1;
+    // Get new histogram and cumulative histogram
     miliseconds += dev_getHistogram(blocks, threadsPerBlock);
 
     //Transform the image back to RGB-Space if necessary
@@ -276,10 +323,13 @@ float Histogram::dev_equalize(dim3 blocks, dim3 threadsPerBlock)
 // Source: 2010_Szeleski_Computer Vision, algorithm and Applications, 3.1.4 
 void Histogram::host_equalize()
 {
+    //Get Image dimensions from source
     int rows = _src.getRows();
     int cols = _src.getCols();
     int channels = _src.getNumberOfChannels();
     int numPixels = rows*cols*channels;
+
+    //get pointer to Image pixels
     unsigned char* pixelPtr = (unsigned char*)_src.getHostPixelPtr();
 
     // The normalized cumulative histogram is used as a lookup-table to getHistogram the new color values
@@ -289,11 +339,13 @@ void Histogram::host_equalize()
 
     }
 
+    // Convert Image to YCbCr if necessary 
     if(_src.getColorSpace()==colorSpace::rgb)
     {
         _src.host_rgb2yuv();
     }
     
+    // Update Image pixels replacing their values with the ones in the look up table
     for (int i = 0; i < numPixels; i+=channels)
     {
         unsigned char oldPixelVal = pixelPtr[i];
@@ -301,7 +353,7 @@ void Histogram::host_equalize()
         pixelPtr[i] = newPixelVal; 
     }
 
-    //getHistogram new Histogram
+    //Get new histogram and cumulative histogram
     host_getHistogram();
 
     //Transform the image back to RGB-Space if necessary
@@ -309,27 +361,37 @@ void Histogram::host_equalize()
 
 }
 
+// Normalize histogram and image on CUDA device and return execution time
 float Histogram::dev_normalize(dim3 blocks, dim3 threadsPerBlock)
 {
+    // Initialize timing variables
     float miliseconds=0, ms1 = 0;
+
+    // Initialize CUDA events for benchmarking
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
+    // Get Image dimensions from source
     int rows = _src.getRows();
     int cols = _src.getCols();
     int channels = _src.getNumberOfChannels();
     int numPixels = rows*cols*channels;
+
+    // Get pointer to Image pixels
     unsigned char* host_pixelPtr = (unsigned char*)_src.getHostPixelPtr(); 
 
+    //  Get biggest and smallest image value on image (sequentially)
     unsigned char maxPixel = getMax(host_pixelPtr, numPixels, _src.getColorSpace());
     unsigned char minPixel = getMin(host_pixelPtr, numPixels, _src.getColorSpace());
 
+    // Convert to YCbCr if necessary
     if(_src.getColorSpace()==colorSpace::rgb)
     {
         miliseconds += _src.dev_rgb2yuv(blocks, threadsPerBlock);
     }
 
+    // Allocate memory on CUDA device
     gpuErrchk(cudaMalloc((void**)& _dev_lookUpTable, _numValues*sizeof(unsigned char)));
     gpuErrchk(cudaMalloc((void**)& _dev_pixels, numPixels*sizeof(unsigned char)));
 
@@ -339,10 +401,10 @@ float Histogram::dev_normalize(dim3 blocks, dim3 threadsPerBlock)
     
     gpuErrchk(cudaMemcpy(_dev_lookUpTable, _host_lookUpTable, _numValues*sizeof(unsigned char), cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(_dev_pixels, host_pixelPtr, numPixels*sizeof(unsigned char), cudaMemcpyHostToDevice));
-    
+    // Store the normalized pixel values into  lookup table
     normalizationLookUpTable<<<1, 256, _numValues*sizeof(unsigned char)>>>(_dev_lookUpTable,_numValues, maxPixel, minPixel);
     gpuErrchk(cudaGetLastError());
-
+    // Replace the pixel values in the source image with those of the lookup table
     updatePixelsFromLookUp<<<blocks, threadsPerBlock>>>(_dev_pixels, _dev_lookUpTable, rows, cols, channels);
     gpuErrchk(cudaGetLastError());
 
@@ -355,13 +417,15 @@ float Histogram::dev_normalize(dim3 blocks, dim3 threadsPerBlock)
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&ms1, start, stop);
 
+    // Free CUDA device memory
     cudaFree(_dev_lookUpTable);
     cudaFree(_dev_pixels); 
 
     miliseconds += ms1;
     
+    // Update histogram and cumulative histogram
     miliseconds += dev_getHistogram(blocks, threadsPerBlock);
-
+    // Convert back to RGB if necessary
     miliseconds +=_src.dev_yuv2rgb(blocks, threadsPerBlock);
 
     return miliseconds;
@@ -370,28 +434,32 @@ float Histogram::dev_normalize(dim3 blocks, dim3 threadsPerBlock)
 // Normalize Histogram
 void Histogram::host_normalize()
 {
-    
+    // Get Image dimensions from source
     int rows = _src.getRows();
     int cols = _src.getCols();
     int channels = _src.getNumberOfChannels();
     int numPixels = rows*cols*channels;
+
+    // Get pointer to image pixels from source
     unsigned char* pixelPtr = (unsigned char*)_src.getHostPixelPtr(); 
 
+    //  Get biggest and smallest image value on image 
     unsigned char maxPixel = getMax(pixelPtr, numPixels, _src.getColorSpace());
     unsigned char minPixel = getMin(pixelPtr, numPixels, _src.getColorSpace());
 
-    // Create Lookup-table
+    // Fill Lookup-table with normalized grey values
     for (int i = 0; i < _numValues; i++)
     {
         _host_lookUpTable[i] = host_clamp(_numValues*(i - minPixel)/(double)(maxPixel-minPixel));           
     }
     
-    // Normalize image
+    // Convert Image to YCrCb if necessary
     if(_src.getColorSpace()== colorSpace::rgb)
     {
         _src.host_rgb2yuv();
     }
-    
+
+    // Update pixels with the values from the lookup table
     for (int i = 0; i < numPixels; i+= channels)
     {
         unsigned char oldPixelVal = pixelPtr[i];
@@ -407,9 +475,9 @@ void Histogram::host_normalize()
 
 }
 
+// Save histogram and cumulative histogram as a .txt file into the give path
 void Histogram::save(string path)
 {
-    //Save the histogram into a txt-file
     path += ".txt";
 
     ofstream dstFile(path.data());
@@ -439,7 +507,7 @@ void Histogram::save(string path)
 // Implement a one-dimensional version of the local-histograms-kernel proposed in https://developer.nvidia.com/blog/gpu-pro-tip-fast-histograms-using-shared-atomics-maxwell/
 __global__ void partialHistograms(unsigned char* pixelPtr, int* g_partialHistograms, int numValues, int rows, int cols, int channels)
 {
-    // Allocate shared memory for partial histogram (one histogram per block)
+
     extern __shared__ int s_partialHistogram[];
 
     // Local (block-intern) thread index 
@@ -501,9 +569,11 @@ __global__ void partialCumulativeHistograms(int* values, int* g_partialCumulativ
 {
     extern __shared__ int s_partialCumulative[];
 
+    // Local (block-intern) thread index 
     int localThreadIdx = threadIdx.x;
-    int globalThreadIdx = threadIdx.x + blockIdx.x*blockDim.x;
     int localNumThreads = blockDim.x;
+
+    int globalThreadIdx = threadIdx.x + blockIdx.x*blockDim.x;
 
     int offset = 1;
     
@@ -574,6 +644,7 @@ __global__ void partialCumulativeHistograms(int* values, int* g_partialCumulativ
     }
 }
 
+// Build the prefix sum of the sums-array from the partialCumulativeHistograms kernel
 __global__ void auxiliaryCumulativeHistogram(int* sums,  int n)
 {
    //Apply parallel Scan-Sum ALgorithm to the sums-array containing the sums of the partial cumulative histograms using global memory
@@ -636,6 +707,7 @@ __global__ void auxiliaryCumulativeHistogram(int* sums,  int n)
 
 }
 
+// Use the elements of the sums-array from auxiliaryCumulativeHistogram as an offset for the partial cumulative histograms
 __global__ void globalCumulativeHistogram(int* g_partialCumulative, int* sums, double* _dev_valuesCumulative, int numValues, int nPartial, int rows, int cols)
 {
     int globalThreadIdx = threadIdx.x + blockIdx.x*blockDim.x; 
@@ -653,6 +725,7 @@ __global__ void normalizationLookUpTable(unsigned char* dev_lookUpTable, int num
 {
     extern __shared__ unsigned char s_lookUpTable[];
 
+    // Local (block-intern) thread index 
     int localThreadIdx = threadIdx.x;
     int localNumThreads = blockDim.x;
 
@@ -669,10 +742,12 @@ __global__ void normalizationLookUpTable(unsigned char* dev_lookUpTable, int num
 
 }
 
+// Fill the lookup table with the values of the cumulative histogram
 __global__ void equalizationLookUpTable(unsigned char* dev_lookUpTable, double* dev_valuesCumulative, int numValues)
 {
     extern __shared__ unsigned char s_lookUpTable[];
 
+    // Local (block-intern) thread index 
     int localThreadIdx = threadIdx.x;
     int localNumThreads = blockDim.x;
 
@@ -688,6 +763,7 @@ __global__ void equalizationLookUpTable(unsigned char* dev_lookUpTable, double* 
     }
 }
 
+// Replace pixel values with the ones in a lookup table
 __global__ void updatePixelsFromLookUp( unsigned char* pixelPtr, unsigned char* dev_lookUpTable, int rows, int cols, int channels)
 {
     int globalThreadIdx = threadIdx.x + blockIdx.x*blockDim.x;
